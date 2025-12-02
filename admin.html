@@ -195,7 +195,7 @@
       <h2>Welcome</h2>
       <p>You are logged in as an administrator.</p>
       <p class="note">
-        Use this dashboard to manage competitions, and (next) divisions, athletes, and live results.
+        Use this dashboard to manage competitions, divisions, and (now) athletes.
       </p>
     </div>
 
@@ -291,6 +291,55 @@
         </div>
       </div>
     </div>
+
+    <!-- Athletes -->
+    <div class="card">
+      <h2>Athletes for Division</h2>
+      <p class="note">
+        Select a competition and division, then add athletes (name, NOC, bib) to that division.
+      </p>
+
+      <label for="athlete-comp-select">Competition</label>
+      <select id="athlete-comp-select">
+        <option value="">Select a competition</option>
+      </select>
+
+      <label for="athlete-div-select" style="margin-top: 8px;">Division</label>
+      <select id="athlete-div-select">
+        <option value="">Select a division</option>
+      </select>
+
+      <div id="athlete-section" style="margin-top: 10px; display: none;">
+        <form id="athlete-form">
+          <div class="form-row">
+            <div>
+              <label for="ath-first-name">First name</label>
+              <input id="ath-first-name" type="text" required placeholder="e.g., Luke" />
+            </div>
+            <div>
+              <label for="ath-last-name">Last name</label>
+              <input id="ath-last-name" type="text" required placeholder="e.g., Filar" />
+            </div>
+            <div>
+              <label for="ath-noc">NOC</label>
+              <input id="ath-noc" type="text" placeholder="e.g., USA" />
+            </div>
+            <div>
+              <label for="ath-bib">Bib number</label>
+              <input id="ath-bib" type="text" placeholder="e.g., 12" />
+            </div>
+          </div>
+          <button type="submit" class="primary">Add athlete to division</button>
+          <div id="athlete-form-message" class="message"></div>
+        </form>
+
+        <div style="margin-top: 12px;">
+          <h3 style="margin: 0; font-size: 1rem;">Athletes in division</h3>
+          <div id="athlete-list-message" class="message"></div>
+          <div id="athletes-container"></div>
+        </div>
+      </div>
+    </div>
   </main>
 
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
@@ -316,6 +365,17 @@
     const divisionListMsg = document.getElementById("division-list-message");
     const divisionsContainer = document.getElementById("divisions-container");
 
+    const athleteCompSelect = document.getElementById("athlete-comp-select");
+    const athleteDivSelect = document.getElementById("athlete-div-select");
+    const athleteSection = document.getElementById("athlete-section");
+    const athleteForm = document.getElementById("athlete-form");
+    const athleteFormMsg = document.getElementById("athlete-form-message");
+    const athleteListMsg = document.getElementById("athlete-list-message");
+    const athletesContainer = document.getElementById("athletes-container");
+
+    let competitionsCache = [];
+    let divisionsCacheByCompetition = {};
+
     function setFormMessage(text, type = "info") {
       formMsg.textContent = text || "";
       formMsg.className = "message " + (type === "error" ? "error" : type === "success" ? "success" : "");
@@ -334,6 +394,16 @@
     function setDivisionListMessage(text, type = "info") {
       divisionListMsg.textContent = text || "";
       divisionListMsg.className = "message " + (type === "error" ? "error" : type === "success" ? "success" : "");
+    }
+
+    function setAthleteFormMessage(text, type = "info") {
+      athleteFormMsg.textContent = text || "";
+      athleteFormMsg.className = "message " + (type === "error" ? "error" : type === "success" ? "success" : "");
+    }
+
+    function setAthleteListMessage(text, type = "info") {
+      athleteListMsg.textContent = text || "";
+      athleteListMsg.className = "message " + (type === "error" ? "error" : type === "success" ? "success" : "");
     }
 
     async function requireAuth() {
@@ -359,18 +429,19 @@
 
     function formatDate(d) {
       if (!d) return "";
-      // Supabase returns YYYY-MM-DD for date type
-      return d;
+      return d; // Supabase returns YYYY-MM-DD for date type
     }
 
     function renderCompetitions(list) {
+      competitionsCache = list || [];
+
       if (!list || list.length === 0) {
         competitionsContainer.innerHTML = '<p class="note">No competitions found yet.</p>';
         divisionCompSelect.innerHTML = '<option value="">Select a competition</option>';
+        athleteCompSelect.innerHTML = '<option value="">Select a competition</option>';
         return;
       }
 
-      // Table
       const rows = list.map(c => {
         return `
           <tr>
@@ -402,11 +473,10 @@
         </table>
       `;
 
-      // Dropdown for divisions
-      const options = ['<option value="">Select a competition</option>'].concat(
-        list.map(c => `<option value="${c.id}">${c.name}</option>`)
-      );
-      divisionCompSelect.innerHTML = options.join("");
+      const baseOption = '<option value="">Select a competition</option>';
+      const options = list.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+      divisionCompSelect.innerHTML = baseOption + options;
+      athleteCompSelect.innerHTML = baseOption + options;
     }
 
     function renderDivisions(divisions) {
@@ -444,6 +514,52 @@
       `;
     }
 
+    function populateAthleteDivisionSelect(divisions) {
+      const baseOption = '<option value="">Select a division</option>';
+      if (!divisions || divisions.length === 0) {
+        athleteDivSelect.innerHTML = baseOption;
+        return;
+      }
+      const options = divisions.map(d => `<option value="${d.id}">${d.name}</option>`).join("");
+      athleteDivSelect.innerHTML = baseOption + options;
+    }
+
+    function renderAthletes(entries) {
+      if (!entries || entries.length === 0) {
+        athletesContainer.innerHTML = '<p class="note">No athletes added yet for this division.</p>';
+        return;
+      }
+
+      const rows = entries.map(e => {
+        const a = e.athletes || e.athlete || {};
+        const fullName = [a.first_name, a.last_name].filter(Boolean).join(" ");
+        return `
+          <tr>
+            <td>${fullName || ""}</td>
+            <td>${a.noc || ""}</td>
+            <td>${e.bib_number || ""}</td>
+            <td>${e.created_at ? e.created_at.slice(0, 10) : ""}</td>
+          </tr>
+        `;
+      }).join("");
+
+      athletesContainer.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>NOC</th>
+              <th>Bib</th>
+              <th>Added</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+      `;
+    }
+
     async function loadCompetitions() {
       setListMessage("Loading competitions...");
       const { data, error } = await supabase
@@ -456,6 +572,7 @@
         setListMessage("Failed to load competitions.", "error");
         competitionsContainer.innerHTML = "";
         divisionCompSelect.innerHTML = '<option value="">Select a competition</option>';
+        athleteCompSelect.innerHTML = '<option value="">Select a competition</option>';
         return;
       }
 
@@ -467,7 +584,7 @@
       if (!competitionId) {
         divisionsContainer.innerHTML = "";
         setDivisionListMessage("Select a competition to view divisions.");
-        return;
+        return [];
       }
 
       setDivisionListMessage("Loading divisions...");
@@ -482,11 +599,63 @@
         console.error(error);
         setDivisionListMessage("Failed to load divisions.", "error");
         divisionsContainer.innerHTML = "";
-        return;
+        return [];
       }
 
       setDivisionListMessage("");
+      divisionsCacheByCompetition[competitionId] = data;
       renderDivisions(data);
+      return data;
+    }
+
+    async function loadAthleteDivisionsForCompetition(competitionId) {
+      if (!competitionId) {
+        athleteDivSelect.innerHTML = '<option value="">Select a division</option>';
+        return;
+      }
+
+      const cached = divisionsCacheByCompetition[competitionId];
+      if (cached) {
+        populateAthleteDivisionSelect(cached);
+        return;
+      }
+
+      const divisions = await loadDivisionsForCompetition(competitionId);
+      populateAthleteDivisionSelect(divisions);
+    }
+
+    async function loadAthletesForDivision(divisionId) {
+      if (!divisionId) {
+        athletesContainer.innerHTML = "";
+        setAthleteListMessage("Select a division to view athletes.");
+        return;
+      }
+
+      setAthleteListMessage("Loading athletes...");
+      const { data, error } = await supabase
+        .from("entries")
+        .select(`
+          id,
+          bib_number,
+          created_at,
+          athletes (
+            first_name,
+            last_name,
+            noc
+          )
+        `)
+        .eq("division_id", divisionId)
+        .order("id", { ascending: true });
+
+      if (error) {
+        console.error(error);
+        setAthleteListMessage("Failed to load athletes.", "error");
+        athletesContainer.innerHTML = "";
+        return;
+      }
+
+      setAthleteListMessage("");
+      renderAthletes(data);
     }
 
     form.addEventListener("submit", async (e) => {
@@ -556,7 +725,7 @@
       }
 
       const { error } = await supabase.from("divisions").insert({
-        competition_id: competitionId,
+        competition_id: Number(competitionId),
         name,
         age_group: ageGroup || null,
         gender: gender || null,
@@ -572,15 +741,96 @@
       setDivisionFormMessage("Division added.", "success");
       divisionForm.reset();
       document.getElementById("div-gender").value = "M";
-      await loadDivisionsForCompetition(competitionId);
+      const divisions = await loadDivisionsForCompetition(competitionId);
+      populateAthleteDivisionSelect(divisions);
+    });
+
+    athleteCompSelect.addEventListener("change", async () => {
+      const compId = athleteCompSelect.value;
+      athleteSection.style.display = "none";
+      setAthleteListMessage("Select a division to view athletes.");
+      athletesContainer.innerHTML = "";
+      await loadAthleteDivisionsForCompetition(compId);
+    });
+
+    athleteDivSelect.addEventListener("change", async () => {
+      const divisionId = athleteDivSelect.value;
+      if (!divisionId) {
+        athleteSection.style.display = "none";
+        setAthleteListMessage("Select a division to view athletes.");
+        athletesContainer.innerHTML = "";
+        return;
+      }
+      athleteSection.style.display = "block";
+      await loadAthletesForDivision(Number(divisionId));
+    });
+
+    athleteForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      setAthleteFormMessage("Adding athlete...");
+
+      const compId = athleteCompSelect.value;
+      const divisionId = athleteDivSelect.value;
+
+      if (!compId || !divisionId) {
+        setAthleteFormMessage("Please select competition and division first.", "error");
+        return;
+      }
+
+      const firstName = document.getElementById("ath-first-name").value.trim();
+      const lastName = document.getElementById("ath-last-name").value.trim();
+      const noc = document.getElementById("ath-noc").value.trim();
+      const bib = document.getElementById("ath-bib").value.trim();
+
+      if (!firstName || !lastName) {
+        setAthleteFormMessage("First and last name are required.", "error");
+        return;
+      }
+
+      // 1) Create or insert athlete
+      const { data: newAthlete, error: athleteError } = await supabase
+        .from("athletes")
+        .insert({
+          first_name: firstName,
+          last_name: lastName,
+          noc: noc || null
+        })
+        .select()
+        .single();
+
+      if (athleteError) {
+        console.error(athleteError);
+        setAthleteFormMessage("Failed to add athlete: " + (athleteError.message || ""), "error");
+        return;
+      }
+
+      // 2) Create entry linking athlete to competition + division
+      const { error: entryError } = await supabase
+        .from("entries")
+        .insert({
+          competition_id: Number(compId),
+          division_id: Number(divisionId),
+          athlete_id: newAthlete.id,
+          bib_number: bib || null
+        });
+
+      if (entryError) {
+        console.error(entryError);
+        setAthleteFormMessage("Athlete created, but failed to create entry: " + (entryError.message || ""), "error");
+        return;
+      }
+
+      setAthleteFormMessage("Athlete added to division.", "success");
+      athleteForm.reset();
+      await loadAthletesForDivision(Number(divisionId));
     });
 
     (async function init() {
       await requireAuth();
       await loadCompetitions();
       setDivisionListMessage("Select a competition to view divisions.");
+      setAthleteListMessage("Select competition and division to view athletes.");
     })();
   </script>
 </body>
 </html>
-
