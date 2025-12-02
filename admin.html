@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>PentathlonScore – Admin Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f3f4f6;
+      color: #111827;
+    }
+
+    header {
+      background: #111827;
+      color: #f9fafb;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 1.2rem;
+    }
+
+    header button {
+      padding: 6px 10px;
+      font-size: 0.85rem;
+      border-radius: 4px;
+      border: none;
+      background: #ef4444;
+      color: white;
+      cursor: pointer;
+    }
+
+    header button:hover {
+      background: #b91c1c;
+    }
+
+    main {
+      max-width: 1100px;
+      margin: 16px auto;
+      padding: 0 12px 32px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 16px 14px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+      margin-bottom: 16px;
+    }
+
+    h2 {
+      margin-top: 0;
+      font-size: 1.1rem;
+    }
+
+    p {
+      margin-top: 4px;
+      font-size: 0.9rem;
+      color: #4b5563;
+    }
+
+    .note {
+      font-size: 0.85rem;
+      color: #6b7280;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>PentathlonScore Admin</h1>
+    <button id="logoutBtn">Log Out</button>
+  </header>
+
+  <main>
+    <div class="card">
+      <h2>Welcome</h2>
+      <p>You are logged in as an administrator.</p>
+      <p class="note">
+        This page will eventually allow you to:
+      </p>
+      <ul class="note">
+        <li>Create competitions and divisions (U15/U19/Senior Men & Women)</li>
+        <li>Add athletes and assign them to divisions</li>
+        <li>Enter live results for Fencing, Swim, Obstacle, and Laser Run</li>
+        <li>Automatically update the public results page.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>Next Steps</h2>
+      <p>
+        For now, this is just a placeholder to confirm that authentication is working.
+        Once you confirm you can log in here, we’ll start adding real admin tools:
+      </p>
+      <ul class="note">
+        <li>A competition list and "Create Competition" form</li>
+        <li>Division and athlete management</li>
+        <li>Result entry forms that update the public display.</li>
+      </ul>
+    </div>
+  </main>
+
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = "https://cbwifmgrekugoljcaqoh.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNid2lmbWdyZWt1Z29samNhcW9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3MDcxODYsImV4cCI6MjA4MDI4MzE4Nn0.Rp5MCWYQL9SxbnBEJ7e76gbbd95qsStaLE2Hkhpn47g";
+
+    const { createClient } = window.supabase;
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    async function requireAuth() {
+      const { data } = await supabase.auth.getSession();
+      if (!data || !data.session) {
+        // Not logged in → send to login page
+        window.location.href = "/admin-login.html";
+      }
+    }
+
+    requireAuth();
+
+    const logoutBtn = document.getElementById("logoutBtn");
+    logoutBtn.addEventListener("click", async () => {
+      await supabase.auth.signOut();
+      window.location.href = "/admin-login.html";
+    });
+  </script>
+</body>
+</html>
