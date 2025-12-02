@@ -217,6 +217,18 @@
       color: #6b7280;
       margin-left: 8px;
     }
+
+    .results-input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 4px 6px;
+      font-size: 0.8rem;
+      margin-bottom: 4px;
+    }
+
+    .results-table th, .results-table td {
+      text-align: center;
+    }
   </style>
 </head>
 <body>
@@ -230,7 +242,7 @@
       <h2>Welcome</h2>
       <p>You are logged in as an administrator.</p>
       <p class="note">
-        Use this dashboard to manage competitions, divisions, and athletes.
+        Use this dashboard to manage competitions, divisions, athletes, and results.
       </p>
     </div>
 
@@ -320,18 +332,18 @@
         </form>
 
         <div style="margin-top: 12px;">
-          <h3 style="margin: 0, font-size: 1rem;">Divisions</h3>
+          <h3 style="margin: 0; font-size: 1rem;">Divisions</h3>
           <div id="division-list-message" class="message"></div>
           <div id="divisions-container"></div>
         </div>
       </div>
     </div>
 
-    <!-- Athletes -->
+    <!-- Athletes + Results -->
     <div class="card">
-      <h2>Athletes for Division</h2>
+      <h2>Athletes & Results</h2>
       <p class="note">
-        Select a competition and division, then add or edit athletes (name, NOC, bib) for that division.
+        Select a competition and division, then add/edit athletes and enter results (raw + points) for each discipline.
       </p>
 
       <label for="athlete-comp-select">Competition</label>
@@ -344,7 +356,8 @@
         <option value="">Select a division</option>
       </select>
 
-      <div id="athlete-section" style="margin-top: 10px, display: none;">
+      <div id="athlete-section" style="margin-top: 10px; display: none;">
+        <!-- Athlete form -->
         <form id="athlete-form">
           <div class="form-row">
             <div>
@@ -366,10 +379,21 @@
           <div id="athlete-form-message" class="message"></div>
         </form>
 
+        <!-- Athletes list -->
         <div style="margin-top: 12px;">
           <h3 style="margin: 0; font-size: 1rem;">Athletes in division</h3>
           <div id="athlete-list-message" class="message"></div>
           <div id="athletes-container"></div>
+        </div>
+
+        <!-- Results editor -->
+        <div style="margin-top: 16px;">
+          <h3 style="margin: 0; font-size: 1rem;">Results for division</h3>
+          <p class="note">
+            Enter raw performance (e.g., "10V 5D", "2:18.50") and points for each discipline. Leave blank if no result yet.
+          </p>
+          <div id="results-list-message" class="message"></div>
+          <div id="results-container"></div>
         </div>
       </div>
     </div>
@@ -408,6 +432,9 @@
     const athleteCancelEditBtn = document.getElementById("athlete-cancel-edit-btn");
     const athleteModeLabel = document.getElementById("athlete-mode-label");
 
+    const resultsListMsg = document.getElementById("results-list-message");
+    const resultsContainer = document.getElementById("results-container");
+
     let competitionsCache = [];
     let divisionsCacheByCompetition = {};
     let editingEntryId = null;
@@ -443,26 +470,9 @@
       athleteListMsg.className = "message " + (type === "error" ? "error" : type === "success" ? "success" : "");
     }
 
-    function enterAddMode() {
-      editingEntryId = null;
-      editingAthleteId = null;
-      athleteSubmitBtn.textContent = "Add athlete to division";
-      athleteCancelEditBtn.style.display = "none";
-      athleteModeLabel.textContent = "";
-      setAthleteFormMessage("");
-      athleteForm.reset();
-    }
-
-    function enterEditMode({ entryId, athleteId, firstName, lastName, noc, bib }) {
-      editingEntryId = entryId;
-      editingAthleteId = athleteId;
-      document.getElementById("ath-first-name").value = firstName || "";
-      document.getElementById("ath-last-name").value = lastName || "";
-      document.getElementById("ath-noc").value = noc || "";
-      athleteSubmitBtn.textContent = "Save athlete changes";
-      athleteCancelEditBtn.style.display = "inline-block";
-      athleteModeLabel.textContent = "Editing existing athlete in this division";
-      setAthleteFormMessage("");
+    function setResultsListMessage(text, type = "info") {
+      resultsListMsg.textContent = text || "";
+      resultsListMsg.className = "message " + (type === "error" ? "error" : type === "success" ? "success" : "");
     }
 
     async function requireAuth() {
@@ -476,6 +486,28 @@
       await supabase.auth.signOut();
       window.location.href = "/admin-login.html";
     });
+
+    function enterAddMode() {
+      editingEntryId = null;
+      editingAthleteId = null;
+      athleteSubmitBtn.textContent = "Add athlete to division";
+      athleteCancelEditBtn.style.display = "none";
+      athleteModeLabel.textContent = "";
+      setAthleteFormMessage("");
+      athleteForm.reset();
+    }
+
+    function enterEditMode({ entryId, athleteId, firstName, lastName, noc }) {
+      editingEntryId = entryId;
+      editingAthleteId = athleteId;
+      document.getElementById("ath-first-name").value = firstName || "";
+      document.getElementById("ath-last-name").value = lastName || "";
+      document.getElementById("ath-noc").value = noc || "";
+      athleteSubmitBtn.textContent = "Save athlete changes";
+      athleteCancelEditBtn.style.display = "inline-block";
+      athleteModeLabel.textContent = "Editing existing athlete in this division";
+      setAthleteFormMessage("");
+    }
 
     athleteCancelEditBtn.addEventListener("click", () => {
       enterAddMode();
@@ -622,14 +654,13 @@
           const firstName = btn.dataset.firstName || "";
           const lastName = btn.dataset.lastName || "";
           const noc = btn.dataset.noc || "";
-          const bib = btn.dataset.bib || "";
 
           enterEditMode({
             entryId,
             athleteId,
             firstName,
             lastName,
-            noc,
+            noc
           });
         });
       });
@@ -678,7 +709,7 @@
           <thead>
             <tr>
               <th>Name</th>
-              <th>NOC</th>
+              <th>NOC</</th>
               <th>Added</th>
               <th>Actions</th>
             </tr>
@@ -689,6 +720,145 @@
 
       attachEditHandlers();
       attachDeleteHandlers();
+    }
+
+    function getDisciplineResult(resultsArr, discipline) {
+      if (!resultsArr) return null;
+      return resultsArr.find(r => r.discipline === discipline) || null;
+    }
+
+    function renderResultsEditor(entries) {
+      if (!entries || entries.length === 0) {
+        resultsContainer.innerHTML = '<p class="note">No athletes in this division yet.</p>';
+        return;
+      }
+
+      const rows = entries.map(e => {
+        const a = e.athletes || e.athlete || {};
+        const fullName = [a.first_name, a.last_name].filter(Boolean).join(" ");
+        const resArr = e.results || [];
+        const fence = getDisciplineResult(resArr, "fence");
+        const swim = getDisciplineResult(resArr, "swim");
+        const obstacle = getDisciplineResult(resArr, "obstacle");
+        const laser = getDisciplineResult(resArr, "laser");
+
+        return `
+          <tr>
+            <td style="text-align:left;">${fullName || ""}</td>
+            <td>${a.noc || ""}</td>
+            <td>
+              <input class="results-input" id="fence-raw-${e.id}" placeholder="e.g., 10V 5D" value="${fence?.raw_value || ""}" />
+              <input class="results-input" id="fence-pts-${e.id}" type="number" step="1" placeholder="points" value="${fence?.points ?? ""}" />
+            </td>
+            <td>
+              <input class="results-input" id="swim-raw-${e.id}" placeholder="e.g., 2:18.50" value="${swim?.raw_value || ""}" />
+              <input class="results-input" id="swim-pts-${e.id}" type="number" step="1" placeholder="points" value="${swim?.points ?? ""}" />
+            </td>
+            <td>
+              <input class="results-input" id="obstacle-raw-${e.id}" placeholder="e.g., 38.2" value="${obstacle?.raw_value || ""}" />
+              <input class="results-input" id="obstacle-pts-${e.id}" type="number" step="1" placeholder="points" value="${obstacle?.points ?? ""}" />
+            </td>
+            <td>
+              <input class="results-input" id="laser-raw-${e.id}" placeholder="e.g., 9:45.0" value="${laser?.raw_value || ""}" />
+              <input class="results-input" id="laser-pts-${e.id}" type="number" step="1" placeholder="points" value="${laser?.points ?? ""}" />
+            </td>
+            <td>
+              <button type="button" class="btn-secondary save-results-btn" data-entry-id="${e.id}">
+                Save
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join("");
+
+      resultsContainer.innerHTML = `
+        <table class="results-table">
+          <thead>
+            <tr>
+              <th style="text-align:left;">Name</th>
+              <th>NOC</th>
+              <th>Fence<br/><span class="small-text">raw & points</span></th>
+              <th>Swim<br/><span class="small-text">raw & points</span></th>
+              <th>Obstacle<br/><span class="small-text">raw & points</span></th>
+              <th>Laser Run<br/><span class="small-text">raw & points</span></th>
+              <th>Save</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+
+      attachResultsSaveHandlers();
+    }
+
+    async function saveResultsForEntry(entryId) {
+      const id = Number(entryId);
+      if (!id) return;
+
+      const disciplines = ["fence", "swim", "obstacle", "laser"];
+      const upserts = [];
+      const deletes = [];
+
+      disciplines.forEach(disc => {
+        const rawEl = document.getElementById(`${disc}-raw-${id}`);
+        const ptsEl = document.getElementById(`${disc}-pts-${id}`);
+        if (!rawEl || !ptsEl) return;
+
+        const raw = rawEl.value.trim();
+        const ptsStr = ptsEl.value.trim();
+
+        if (!raw && !ptsStr) {
+          // Clear result for this discipline
+          deletes.push(disc);
+        } else {
+          upserts.push({
+            entry_id: id,
+            discipline: disc,
+            raw_value: raw || null,
+            points: ptsStr !== "" ? Number(ptsStr) : null
+          });
+        }
+      });
+
+      setResultsListMessage("Saving results...");
+
+      // Delete empty ones
+      for (const disc of deletes) {
+        const { error } = await supabase
+          .from("results")
+          .delete()
+          .eq("entry_id", id)
+          .eq("discipline", disc);
+        if (error) {
+          console.error(error);
+          setResultsListMessage("Failed to save some results (delete). " + (error.message || ""), "error");
+          return;
+        }
+      }
+
+      if (upserts.length > 0) {
+        const { error } = await supabase
+          .from("results")
+          .upsert(upserts, { onConflict: "entry_id,discipline" });
+        if (error) {
+          console.error(error);
+          setResultsListMessage("Failed to save some results (upsert). " + (error.message || ""), "error");
+          return;
+        }
+      }
+
+      setResultsListMessage("Results saved.", "success");
+    }
+
+    function attachResultsSaveHandlers() {
+      const buttons = resultsContainer.querySelectorAll(".save-results-btn");
+      buttons.forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const entryId = btn.dataset.entryId;
+          if (!entryId) return;
+          await saveResultsForEntry(entryId);
+        });
+      });
     }
 
     async function loadCompetitions() {
@@ -758,22 +928,30 @@
     async function loadAthletesForDivision(divisionId) {
       if (!divisionId) {
         athletesContainer.innerHTML = "";
+        resultsContainer.innerHTML = "";
         setAthleteListMessage("Select a division to view athletes.");
+        setResultsListMessage("");
         return;
       }
 
       setAthleteListMessage("Loading athletes...");
+      setResultsListMessage("Loading results...");
+
       const { data, error } = await supabase
         .from("entries")
         .select(`
           id,
           athlete_id,
-          bib_number,
           created_at,
           athletes (
             first_name,
             last_name,
             noc
+          ),
+          results (
+            discipline,
+            raw_value,
+            points
           )
         `)
         .eq("division_id", divisionId)
@@ -783,12 +961,18 @@
         console.error(error);
         setAthleteListMessage("Failed to load athletes.", "error");
         athletesContainer.innerHTML = "";
+        resultsContainer.innerHTML = "";
+        setResultsListMessage("Failed to load results.", "error");
         return;
       }
 
       setAthleteListMessage("");
       renderAthletes(data);
+      setResultsListMessage("");
+      renderResultsEditor(data);
     }
+
+    // Event handlers
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -882,7 +1066,9 @@
       athleteSection.style.display = "none";
       enterAddMode();
       setAthleteListMessage("Select a division to view athletes.");
+      setResultsListMessage("");
       athletesContainer.innerHTML = "";
+      resultsContainer.innerHTML = "";
       await loadAthleteDivisionsForCompetition(compId);
     });
 
@@ -892,7 +1078,9 @@
         athleteSection.style.display = "none";
         enterAddMode();
         setAthleteListMessage("Select a division to view athletes.");
+        setResultsListMessage("");
         athletesContainer.innerHTML = "";
+        resultsContainer.innerHTML = "";
         return;
       }
       athleteSection.style.display = "block";
@@ -966,8 +1154,8 @@
         .insert({
           competition_id: Number(compId),
           division_id: Number(divisionId),
-          athlete_id: newAthlete.id,
-          });
+          athlete_id: newAthlete.id
+        });
 
       if (entryError) {
         console.error(entryError);
@@ -985,8 +1173,8 @@
       await loadCompetitions();
       setDivisionListMessage("Select a competition to view divisions.");
       setAthleteListMessage("Select competition and division to view athletes.");
+      setResultsListMessage("");
     })();
   </script>
 </body>
 </html>
-
