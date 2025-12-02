@@ -114,6 +114,20 @@
       background: #4338ca;
     }
 
+    .btn-danger {
+      padding: 4px 8px;
+      font-size: 0.8rem;
+      border-radius: 4px;
+      border: none;
+      background: #ef4444;
+      color: white;
+      cursor: pointer;
+    }
+
+    .btn-danger:hover {
+      background: #b91c1c;
+    }
+
     .message {
       font-size: 0.85rem;
       margin-top: 6px;
@@ -195,7 +209,7 @@
       <h2>Welcome</h2>
       <p>You are logged in as an administrator.</p>
       <p class="note">
-        Use this dashboard to manage competitions, divisions, and (now) athletes.
+        Use this dashboard to manage competitions, divisions, and athletes.
       </p>
     </div>
 
@@ -344,7 +358,7 @@
 
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script>
-    // Replace with your real Supabase values (same as admin-login.html)
+    // Your real Supabase project values
     const SUPABASE_URL = "https://cbwifmgrekugoljcaqoh.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNid2lmbWdyZWt1Z29samNhcW9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3MDcxODYsImV4cCI6MjA4MDI4MzE4Nn0.Rp5MCWYQL9SxbnBEJ7e76gbbd95qsStaLE2Hkhpn47g";
 
@@ -524,6 +538,35 @@
       athleteDivSelect.innerHTML = baseOption + options;
     }
 
+    function attachDeleteHandlers() {
+      const buttons = athletesContainer.querySelectorAll(".delete-entry-btn");
+      buttons.forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const entryId = Number(btn.dataset.entryId);
+          const divisionId = Number(athleteDivSelect.value);
+          if (!entryId || !divisionId) return;
+
+          const ok = window.confirm("Remove this athlete from this division/competition?");
+          if (!ok) return;
+
+          setAthleteListMessage("Removing athlete from division...");
+          const { error } = await supabase
+            .from("entries")
+            .delete()
+            .eq("id", entryId);
+
+          if (error) {
+            console.error(error);
+            setAthleteListMessage("Failed to remove athlete: " + (error.message || ""), "error");
+            return;
+          }
+
+          setAthleteListMessage("Athlete removed from division.", "success");
+          await loadAthletesForDivision(divisionId);
+        });
+      });
+    }
+
     function renderAthletes(entries) {
       if (!entries || entries.length === 0) {
         athletesContainer.innerHTML = '<p class="note">No athletes added yet for this division.</p>';
@@ -539,6 +582,15 @@
             <td>${a.noc || ""}</td>
             <td>${e.bib_number || ""}</td>
             <td>${e.created_at ? e.created_at.slice(0, 10) : ""}</td>
+            <td>
+              <button
+                type="button"
+                class="btn-danger delete-entry-btn"
+                data-entry-id="${e.id}"
+              >
+                Remove
+              </button>
+            </td>
           </tr>
         `;
       }).join("");
@@ -551,6 +603,7 @@
               <th>NOC</th>
               <th>Bib</th>
               <th>Added</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -558,6 +611,8 @@
           </tbody>
         </table>
       `;
+
+      attachDeleteHandlers();
     }
 
     async function loadCompetitions() {
@@ -787,7 +842,7 @@
         return;
       }
 
-      // 1) Create or insert athlete
+      // 1) Create athlete
       const { data: newAthlete, error: athleteError } = await supabase
         .from("athletes")
         .insert({
@@ -804,7 +859,7 @@
         return;
       }
 
-      // 2) Create entry linking athlete to competition + division
+      // 2) Create entry
       const { error: entryError } = await supabase
         .from("entries")
         .insert({
