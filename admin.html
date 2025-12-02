@@ -71,6 +71,107 @@
       font-size: 0.85rem;
       color: #6b7280;
     }
+
+    label {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 0.85rem;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 6px 8px;
+      font-size: 0.9rem;
+      border-radius: 4px;
+      border: 1px solid #d1d5db;
+      margin-bottom: 10px;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: #6366f1;
+      box-shadow: 0 0 0 1px #6366f1;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px 14px;
+    }
+
+    button.primary {
+      padding: 8px 12px;
+      font-size: 0.9rem;
+      border-radius: 4px;
+      border: none;
+      background: #4f46e5;
+      color: white;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+
+    button.primary:hover {
+      background: #4338ca;
+    }
+
+    .message {
+      font-size: 0.85rem;
+      margin-top: 6px;
+    }
+
+    .message.error {
+      color: #b91c1c;
+    }
+
+    .message.success {
+      color: #15803d;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin-top: 8px;
+    }
+
+    th, td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #e5e7eb;
+      text-align: left;
+    }
+
+    th {
+      background: #f9fafb;
+      font-weight: 600;
+    }
+
+    tr:nth-child(even) td {
+      background: #f9fafb;
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 2px 6px;
+      font-size: 0.75rem;
+      border-radius: 999px;
+      background: #e5e7eb;
+      color: #374151;
+    }
+
+    .tag.live {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .tag.draft {
+      background: #e5e7eb;
+      color: #374151;
+    }
+
+    .tag.finished {
+      background: #fee2e2;
+      color: #991b1b;
+    }
   </style>
 </head>
 <body>
@@ -84,53 +185,205 @@
       <h2>Welcome</h2>
       <p>You are logged in as an administrator.</p>
       <p class="note">
-        This page will eventually allow you to:
+        Use this dashboard to manage competitions, and eventually divisions, athletes, and live results.
       </p>
-      <ul class="note">
-        <li>Create competitions and divisions (U15/U19/Senior Men & Women)</li>
-        <li>Add athletes and assign them to divisions</li>
-        <li>Enter live results for Fencing, Swim, Obstacle, and Laser Run</li>
-        <li>Automatically update the public results page.</li>
-      </ul>
     </div>
 
     <div class="card">
-      <h2>Next Steps</h2>
-      <p>
-        For now, this is just a placeholder to confirm that authentication is working.
-        Once you confirm you can log in here, we’ll start adding real admin tools:
-      </p>
-      <ul class="note">
-        <li>A competition list and "Create Competition" form</li>
-        <li>Division and athlete management</li>
-        <li>Result entry forms that update the public display.</li>
-      </ul>
+      <h2>Create Competition</h2>
+      <p class="note">Add a new competition. You can mark it as draft, live, or finished.</p>
+
+      <form id="competition-form">
+        <div class="form-row">
+          <div>
+            <label for="comp-name">Name</label>
+            <input id="comp-name" type="text" required placeholder="e.g., 2025 Charlotte Invitational" />
+          </div>
+          <div>
+            <label for="comp-location">Location</label>
+            <input id="comp-location" type="text" placeholder="e.g., Charlotte, NC" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div>
+            <label for="comp-start-date">Start date</label>
+            <input id="comp-start-date" type="date" />
+          </div>
+          <div>
+            <label for="comp-end-date">End date</label>
+            <input id="comp-end-date" type="date" />
+          </div>
+          <div>
+            <label for="comp-status">Status</label>
+            <select id="comp-status">
+              <option value="draft">Draft</option>
+              <option value="live">Live</option>
+              <option value="finished">Finished</option>
+            </select>
+          </div>
+        </div>
+
+        <button type="submit" class="primary">Create competition</button>
+        <div id="form-message" class="message"></div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Competitions</h2>
+      <p class="note">All competitions currently in the system.</p>
+      <div id="list-message" class="message"></div>
+      <div id="competitions-container"></div>
     </div>
   </main>
 
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script>
+    // Replace with your real Supabase values (same as admin-login.html)
     const SUPABASE_URL = "https://cbwifmgrekugoljcaqoh.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNid2lmbWdyZWt1Z29samNhcW9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3MDcxODYsImV4cCI6MjA4MDI4MzE4Nn0.Rp5MCWYQL9SxbnBEJ7e76gbbd95qsStaLE2Hkhpn47g";
 
     const { createClient } = window.supabase;
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+    const logoutBtn = document.getElementById("logoutBtn");
+    const form = document.getElementById("competition-form");
+    const formMsg = document.getElementById("form-message");
+    const listMsg = document.getElementById("list-message");
+    const competitionsContainer = document.getElementById("competitions-container");
+
+    function setFormMessage(text, type = "info") {
+      formMsg.textContent = text || "";
+      formMsg.className = "message " + (type === "error" ? "error" : type === "success" ? "success" : "");
+    }
+
+    function setListMessage(text, type = "info") {
+      listMsg.textContent = text || "";
+      listMsg.className = "message " + (type === "error" ? "error" : type === "success" ? "success" : "");
+    }
+
     async function requireAuth() {
       const { data } = await supabase.auth.getSession();
       if (!data || !data.session) {
-        // Not logged in → send to login page
         window.location.href = "/admin-login.html";
       }
     }
 
-    requireAuth();
-
-    const logoutBtn = document.getElementById("logoutBtn");
     logoutBtn.addEventListener("click", async () => {
       await supabase.auth.signOut();
       window.location.href = "/admin-login.html";
     });
+
+    function formatStatusTag(status) {
+      const s = (status || "").toLowerCase();
+      let cls = "tag";
+      if (s === "live") cls += " live";
+      else if (s === "finished") cls += " finished";
+      else cls += " draft";
+      return `<span class="${cls}">${s || "draft"}</span>`;
+    }
+
+    function formatDate(d) {
+      if (!d) return "";
+      // Supabase will return YYYY-MM-DD for date type
+      return d;
+    }
+
+    function renderCompetitions(list) {
+      if (!list || list.length === 0) {
+        competitionsContainer.innerHTML = '<p class="note">No competitions found yet.</p>';
+        return;
+      }
+
+      const rows = list.map(c => {
+        return `
+          <tr>
+            <td>${c.name || ""}</td>
+            <td>${c.location || ""}</td>
+            <td>${formatDate(c.start_date)}</td>
+            <td>${formatDate(c.end_date)}</td>
+            <td>${formatStatusTag(c.status)}</td>
+            <td>${c.created_at ? c.created_at.slice(0, 10) : ""}</td>
+          </tr>
+        `;
+      }).join("");
+
+      competitionsContainer.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Location</th>
+              <th>Start</th>
+              <th>End</th>
+              <th>Status</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+      `;
+    }
+
+    async function loadCompetitions() {
+      setListMessage("Loading competitions...");
+      const { data, error } = await supabase
+        .from("competitions")
+        .select("*")
+        .order("start_date", { ascending: false });
+
+      if (error) {
+        console.error(error);
+        setListMessage("Failed to load competitions.", "error");
+        competitionsContainer.innerHTML = "";
+        return;
+      }
+
+      setListMessage("");
+      renderCompetitions(data);
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      setFormMessage("Creating competition...");
+
+      const name = document.getElementById("comp-name").value.trim();
+      const location = document.getElementById("comp-location").value.trim();
+      const startDate = document.getElementById("comp-start-date").value || null;
+      const endDate = document.getElementById("comp-end-date").value || null;
+      const status = document.getElementById("comp-status").value || "draft";
+
+      if (!name) {
+        setFormMessage("Name is required.", "error");
+        return;
+      }
+
+      const { error } = await supabase.from("competitions").insert({
+        name,
+        location,
+        start_date: startDate,
+        end_date: endDate,
+        status
+      });
+
+      if (error) {
+        console.error(error);
+        setFormMessage("Failed to create competition: " + (error.message || ""), "error");
+        return;
+      }
+
+      setFormMessage("Competition created.", "success");
+      form.reset();
+      document.getElementById("comp-status").value = "draft";
+      await loadCompetitions();
+    });
+
+    (async function init() {
+      await requireAuth();
+      await loadCompetitions();
+    })();
   </script>
 </body>
 </html>
