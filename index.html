@@ -181,10 +181,8 @@
     </div>
   </main>
 
-  <!-- Supabase client -->
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script>
-    // TODO: replace with your real Supabase project values
     const SUPABASE_URL = "https://cbwifmgrekugoljcaqoh.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNid2lmbWdyZWt1Z29samNhcW9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3MDcxODYsImV4cCI6MjA4MDI4MzE4Nn0.Rp5MCWYQL9SxbnBEJ7e76gbbd95qsStaLE2Hkhpn47g";
 
@@ -195,8 +193,28 @@
     const clearBtn = document.getElementById("clearBtn");
     const resultsContainer = document.getElementById("resultsContainer");
 
-    function placeholderDisciplineCell() {
-      // For now, we haven't wired scores yet
+    function formatDate(d) {
+      if (!d) return "";
+      return d;
+    }
+
+    function disciplineObj(resultsArr, disc) {
+      if (!resultsArr) return { raw: null, points: null };
+      const r = resultsArr.find(x => x.discipline === disc);
+      if (!r) return { raw: null, points: null };
+      return {
+        raw: r.raw_value || null,
+        points: r.points !== null && r.points !== undefined ? Number(r.points) : null
+      };
+    }
+
+    function formatDisciplineCell(obj) {
+      if (!obj) return "-";
+      const hasRaw = obj.raw && obj.raw !== "";
+      const hasPts = obj.points !== null && !Number.isNaN(obj.points);
+      if (hasRaw && hasPts) return `${obj.raw} (${obj.points})`;
+      if (hasRaw) return obj.raw;
+      if (hasPts) return String(obj.points);
       return "-";
     }
 
@@ -211,32 +229,65 @@
         `;
       }
 
-      // Sort by athlete last name (or just stable order) for now;
-      // once we add results, we'll sort by total points.
-      const sorted = [...entries].map((e, index) => {
+      const rowsData = entries.map((e) => {
         const a = e.athletes || e.athlete || {};
         const fullName = [a.first_name, a.last_name].filter(Boolean).join(" ");
+        const resArr = e.results || [];
+
+        const fence = disciplineObj(resArr, "fence");
+        const swim = disciplineObj(resArr, "swim");
+        const obstacle = disciplineObj(resArr, "obstacle");
+        const laser = disciplineObj(resArr, "laser");
+
+        const pointsList = [fence, swim, obstacle, laser]
+          .map(r => (r && r.points !== null && !Number.isNaN(r.points)) ? r.points : null);
+
+        const totalPoints = pointsList.reduce((sum, p) => (p !== null ? sum + p : sum), 0);
+        const hasAnyPoints = pointsList.some(p => p !== null);
+
         return {
-          rank: index + 1,
+          entryId: e.id,
           name: fullName,
           noc: a.noc || "",
-          bib: e.bib_number || ""
+          fence,
+          swim,
+          obstacle,
+          laser,
+          totalPoints: hasAnyPoints ? totalPoints : null
         };
       });
 
-      const rowsHtml = sorted.map(r => `
-        <tr>
-          <td>${r.rank}</td>
-          <td>${r.name}</td>
-          <td>${r.noc}</td>
-          <td>${placeholderDisciplineCell()}</td>
-          <td>${placeholderDisciplineCell()}</td>
-          <td>${placeholderDisciplineCell()}</td>
-          <td>${placeholderDisciplineCell()}</td>
-          <td>-</td>
-          <td>-</td>
-        </tr>
-      `).join("");
+      rowsData.sort((a, b) => {
+        const aHas = a.totalPoints !== null;
+        const bHas = b.totalPoints !== null;
+        if (aHas && bHas) {
+          return b.totalPoints - a.totalPoints; // higher points first
+        }
+        if (aHas && !bHas) return -1;
+        if (!aHas && bHas) return 1;
+        // fallback: sort by name
+        return a.name.localeCompare(b.name);
+      });
+
+      const rowsHtml = rowsData.map((r, idx) => {
+        const rank = r.totalPoints !== null ? (idx + 1) : "-";
+        const totalCell = r.totalPoints !== null ? r.totalPoints : "-";
+        const handicapCell = "-"; // to be implemented later
+
+        return `
+          <tr>
+            <td>${rank}</td>
+            <td>${r.name}</td>
+            <td>${r.noc}</td>
+            <td>${formatDisciplineCell(r.fence)}</td>
+            <td>${formatDisciplineCell(r.swim)}</td>
+            <td>${formatDisciplineCell(r.obstacle)}</td>
+            <td>${formatDisciplineCell(r.laser)}</td>
+            <td>${totalCell}</td>
+            <td>${handicapCell}</td>
+          </tr>
+        `;
+      }).join("");
 
       return `
         <div class="category-block">
@@ -263,52 +314,41 @@
       `;
     }
 
-    function formatDate(d) {
-      if (!d) return "";
-      return d; // YYYY-MM-DD
-    }
-
     function renderResults(comp, categories) {
       if (!comp) {
         resultsContainer.innerHTML = '<p class="no-results">Select a competition to view live results.</p>';
-        return;
-      }
-
-      if (!categories || categories.length === 0) {
+      } else if (!categories || categories.length === 0) {
         resultsContainer.innerHTML = `
           <div class="results-header">
             <strong>${comp.name}</strong>
-            <span>${comp.location ? " – " + comp.location : ""} ${comp.start_date ? " (" + comp.start_date + ")" : ""}</span>
+            <span>${comp.location ? " – " + comp.location : ""} ${comp.start_date ? " (" + formatDate(comp.start_date) + ")" : ""}</span>
           </div>
           <p class="no-results">No divisions configured yet for this competition.</p>
         `;
-        return;
+      } else {
+        const sortedCategories = [...categories].sort((a, b) => {
+          const agA = (a.age_group || "").toLowerCase();
+          const agB = (b.age_group || "").toLowerCase();
+          if (agA !== agB) return agA.localeCompare(agB);
+          const gA = (a.gender || "").toLowerCase();
+          const gB = (b.gender || "").toLowerCase();
+          if (gA !== gB) return gA.localeCompare(gB);
+          return a.label.localeCompare(b.label);
+        });
+
+        const categoriesHtml = sortedCategories.map(buildCategoryTable).join("");
+
+        resultsContainer.innerHTML = `
+          <div class="results-header">
+            <strong>${comp.name}</strong>
+            <span>${comp.location ? " – " + comp.location : ""} ${comp.start_date ? " (" + formatDate(comp.start_date) + ")" : ""}</span>
+          </div>
+          ${categoriesHtml}
+        `;
       }
-
-      const sortedCategories = [...categories].sort((a, b) => {
-        // Sort by age_group then gender then name
-        const agA = (a.age_group || "").toLowerCase();
-        const agB = (b.age_group || "").toLowerCase();
-        if (agA !== agB) return agA.localeCompare(agB);
-        const gA = (a.gender || "").toLowerCase();
-        const gB = (b.gender || "").toLowerCase();
-        if (gA !== gB) return gA.localeCompare(gB);
-        return a.label.localeCompare(b.label);
-      });
-
-      const categoriesHtml = sortedCategories.map(buildCategoryTable).join("");
-
-      resultsContainer.innerHTML = `
-        <div class="results-header">
-          <strong>${comp.name}</strong>
-          <span>${comp.location ? " – " + comp.location : ""} ${comp.start_date ? " (" + formatDate(comp.start_date) + ")" : ""}</span>
-        </div>
-        ${categoriesHtml}
-      `;
     }
 
     async function loadCompetitions() {
-      // Load all competitions (draft/live/finished) so you can see your test one too.
       const { data, error } = await supabase
         .from("competitions")
         .select("*")
@@ -320,7 +360,6 @@
         return;
       }
 
-      // Populate dropdown
       selectEl.innerHTML = '<option value="">Select a competition</option>';
       (data || []).forEach(c => {
         const opt = document.createElement("option");
@@ -340,7 +379,6 @@
         return;
       }
 
-      // Get competition info
       const { data: comps, error: compError } = await supabase
         .from("competitions")
         .select("*")
@@ -355,7 +393,6 @@
 
       const competition = comps[0];
 
-      // Get divisions + entries + athletes
       const { data: divisions, error: divError } = await supabase
         .from("divisions")
         .select(`
@@ -365,12 +402,16 @@
           gender,
           entries (
             id,
-            bib_number,
             created_at,
             athletes (
               first_name,
               last_name,
               noc
+            ),
+            results (
+              discipline,
+              raw_value,
+              points
             )
           )
         `)
