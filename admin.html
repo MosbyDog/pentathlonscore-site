@@ -172,6 +172,16 @@
       background: #fee2e2;
       color: #991b1b;
     }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 6px;
+      font-size: 0.75rem;
+      border-radius: 999px;
+      background: #e5e7eb;
+      color: #374151;
+      margin-right: 4px;
+    }
   </style>
 </head>
 <body>
@@ -185,10 +195,11 @@
       <h2>Welcome</h2>
       <p>You are logged in as an administrator.</p>
       <p class="note">
-        Use this dashboard to manage competitions, and eventually divisions, athletes, and live results.
+        Use this dashboard to manage competitions, and (next) divisions, athletes, and live results.
       </p>
     </div>
 
+    <!-- Create competition -->
     <div class="card">
       <h2>Create Competition</h2>
       <p class="note">Add a new competition. You can mark it as draft, live, or finished.</p>
@@ -229,11 +240,56 @@
       </form>
     </div>
 
+    <!-- List competitions -->
     <div class="card">
       <h2>Competitions</h2>
       <p class="note">All competitions currently in the system.</p>
       <div id="list-message" class="message"></div>
       <div id="competitions-container"></div>
+    </div>
+
+    <!-- Divisions -->
+    <div class="card">
+      <h2>Divisions for Competition</h2>
+      <p class="note">
+        Select a competition, then add its age/gender divisions (e.g., U15 Men, U19 Women, Senior Men).
+      </p>
+
+      <label for="division-comp-select">Competition</label>
+      <select id="division-comp-select">
+        <option value="">Select a competition</option>
+      </select>
+
+      <div id="division-section" style="margin-top: 10px; display: none;">
+        <form id="division-form">
+          <div class="form-row">
+            <div>
+              <label for="div-name">Division name</label>
+              <input id="div-name" type="text" required placeholder="e.g., U15 Men" />
+            </div>
+            <div>
+              <label for="div-age-group">Age group</label>
+              <input id="div-age-group" type="text" placeholder="e.g., U15, U19, Senior" />
+            </div>
+            <div>
+              <label for="div-gender">Gender</label>
+              <select id="div-gender">
+                <option value="M">Men (M)</option>
+                <option value="F">Women (F)</option>
+                <option value="Mixed">Mixed</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit" class="primary">Add division</button>
+          <div id="division-form-message" class="message"></div>
+        </form>
+
+        <div style="margin-top: 12px;">
+          <h3 style="margin: 0; font-size: 1rem;">Divisions</h3>
+          <div id="division-list-message" class="message"></div>
+          <div id="divisions-container"></div>
+        </div>
+      </div>
     </div>
   </main>
 
@@ -247,10 +303,18 @@
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const logoutBtn = document.getElementById("logoutBtn");
+
     const form = document.getElementById("competition-form");
     const formMsg = document.getElementById("form-message");
     const listMsg = document.getElementById("list-message");
     const competitionsContainer = document.getElementById("competitions-container");
+
+    const divisionCompSelect = document.getElementById("division-comp-select");
+    const divisionSection = document.getElementById("division-section");
+    const divisionForm = document.getElementById("division-form");
+    const divisionFormMsg = document.getElementById("division-form-message");
+    const divisionListMsg = document.getElementById("division-list-message");
+    const divisionsContainer = document.getElementById("divisions-container");
 
     function setFormMessage(text, type = "info") {
       formMsg.textContent = text || "";
@@ -260,6 +324,16 @@
     function setListMessage(text, type = "info") {
       listMsg.textContent = text || "";
       listMsg.className = "message " + (type === "error" ? "error" : type === "success" ? "success" : "");
+    }
+
+    function setDivisionFormMessage(text, type = "info") {
+      divisionFormMsg.textContent = text || "";
+      divisionFormMsg.className = "message " + (type === "error" ? "error" : type === "success" ? "success" : "");
+    }
+
+    function setDivisionListMessage(text, type = "info") {
+      divisionListMsg.textContent = text || "";
+      divisionListMsg.className = "message " + (type === "error" ? "error" : type === "success" ? "success" : "");
     }
 
     async function requireAuth() {
@@ -285,16 +359,18 @@
 
     function formatDate(d) {
       if (!d) return "";
-      // Supabase will return YYYY-MM-DD for date type
+      // Supabase returns YYYY-MM-DD for date type
       return d;
     }
 
     function renderCompetitions(list) {
       if (!list || list.length === 0) {
         competitionsContainer.innerHTML = '<p class="note">No competitions found yet.</p>';
+        divisionCompSelect.innerHTML = '<option value="">Select a competition</option>';
         return;
       }
 
+      // Table
       const rows = list.map(c => {
         return `
           <tr>
@@ -325,6 +401,47 @@
           </tbody>
         </table>
       `;
+
+      // Dropdown for divisions
+      const options = ['<option value="">Select a competition</option>'].concat(
+        list.map(c => `<option value="${c.id}">${c.name}</option>`)
+      );
+      divisionCompSelect.innerHTML = options.join("");
+    }
+
+    function renderDivisions(divisions) {
+      if (!divisions || divisions.length === 0) {
+        divisionsContainer.innerHTML = '<p class="note">No divisions added yet for this competition.</p>';
+        return;
+      }
+
+      const rows = divisions.map(d => `
+        <tr>
+          <td>${d.name || ""}</td>
+          <td>
+            ${d.age_group ? `<span class="pill">${d.age_group}</span>` : ""}
+            ${d.gender ? `<span class="pill">${d.gender}</span>` : ""}
+          </td>
+          <td>${d.order_index ?? ""}</td>
+          <td>${d.created_at ? d.created_at.slice(0, 10) : ""}</td>
+        </tr>
+      `).join("");
+
+      divisionsContainer.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Tags</th>
+              <th>Order</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+      `;
     }
 
     async function loadCompetitions() {
@@ -338,11 +455,38 @@
         console.error(error);
         setListMessage("Failed to load competitions.", "error");
         competitionsContainer.innerHTML = "";
+        divisionCompSelect.innerHTML = '<option value="">Select a competition</option>';
         return;
       }
 
       setListMessage("");
       renderCompetitions(data);
+    }
+
+    async function loadDivisionsForCompetition(competitionId) {
+      if (!competitionId) {
+        divisionsContainer.innerHTML = "";
+        setDivisionListMessage("Select a competition to view divisions.");
+        return;
+      }
+
+      setDivisionListMessage("Loading divisions...");
+      const { data, error } = await supabase
+        .from("divisions")
+        .select("*")
+        .eq("competition_id", competitionId)
+        .order("order_index", { ascending: true })
+        .order("name", { ascending: true });
+
+      if (error) {
+        console.error(error);
+        setDivisionListMessage("Failed to load divisions.", "error");
+        divisionsContainer.innerHTML = "";
+        return;
+      }
+
+      setDivisionListMessage("");
+      renderDivisions(data);
     }
 
     form.addEventListener("submit", async (e) => {
@@ -380,10 +524,63 @@
       await loadCompetitions();
     });
 
+    divisionCompSelect.addEventListener("change", async () => {
+      const compId = divisionCompSelect.value;
+      if (!compId) {
+        divisionSection.style.display = "none";
+        setDivisionListMessage("Select a competition to view divisions.");
+        divisionsContainer.innerHTML = "";
+        return;
+      }
+      divisionSection.style.display = "block";
+      await loadDivisionsForCompetition(compId);
+    });
+
+    divisionForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      setDivisionFormMessage("Adding division...");
+
+      const competitionId = divisionCompSelect.value;
+      if (!competitionId) {
+        setDivisionFormMessage("Please select a competition first.", "error");
+        return;
+      }
+
+      const name = document.getElementById("div-name").value.trim();
+      const ageGroup = document.getElementById("div-age-group").value.trim();
+      const gender = document.getElementById("div-gender").value;
+
+      if (!name) {
+        setDivisionFormMessage("Division name is required.", "error");
+        return;
+      }
+
+      const { error } = await supabase.from("divisions").insert({
+        competition_id: competitionId,
+        name,
+        age_group: ageGroup || null,
+        gender: gender || null,
+        order_index: 0
+      });
+
+      if (error) {
+        console.error(error);
+        setDivisionFormMessage("Failed to add division: " + (error.message || ""), "error");
+        return;
+      }
+
+      setDivisionFormMessage("Division added.", "success");
+      divisionForm.reset();
+      document.getElementById("div-gender").value = "M";
+      await loadDivisionsForCompetition(competitionId);
+    });
+
     (async function init() {
       await requireAuth();
       await loadCompetitions();
+      setDivisionListMessage("Select a competition to view divisions.");
     })();
   </script>
 </body>
 </html>
+
