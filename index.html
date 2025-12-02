@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>PentathlonScore – Live Results</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f4f4f7;
+      color: #222;
+    }
+
+    header {
+      background: #111827;
+      color: #fff;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    header h1 {
+      font-size: 1.25rem;
+      margin: 0;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 12px;
+      font-size: 0.9rem;
+      flex-wrap: wrap;
+    }
+
+    .nav-links a {
+      color: #cbd2ff;
+      text-decoration: none;
+    }
+
+    .nav-links a:hover {
+      text-decoration: underline;
+    }
+
+    main {
+      max-width: 1100px;
+      margin: 16px auto;
+      padding: 0 12px 32px;
+    }
+
+    h2 {
+      margin-top: 0;
+      font-size: 1.2rem;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    select, button {
+      font-size: 0.95rem;
+      padding: 6px 10px;
+    }
+
+    button {
+      border-radius: 4px;
+      border: 1px solid #d1d5db;
+      background: #e5e7eb;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #d4d7dd;
+    }
+
+    .results-header {
+      margin-bottom: 8px;
+      font-size: 0.95rem;
+      color: #333;
+    }
+
+    .results-header span {
+      color: #4b5563;
+      font-size: 0.9rem;
+    }
+
+    .category-block {
+      margin-top: 18px;
+      margin-bottom: 10px;
+    }
+
+    .category-title {
+      font-weight: 600;
+      margin-bottom: 4px;
+      font-size: 0.98rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    thead {
+      background: #1f2937;
+      color: #fff;
+    }
+
+    th, td {
+      padding: 6px 8px;
+      font-size: 0.85rem;
+      text-align: center;
+      border-bottom: 1px solid #e5e7eb;
+      white-space: nowrap;
+    }
+
+    th:nth-child(2), td:nth-child(2) {
+      text-align: left;
+    }
+
+    tr:nth-child(even) td {
+      background: #f9fafb;
+    }
+
+    .no-results {
+      font-size: 0.95rem;
+      color: #555;
+      margin-top: 12px;
+    }
+
+    @media (max-width: 800px) {
+      th, td {
+        font-size: 0.75rem;
+        padding: 4px 6px;
+      }
+    }
+
+    @media (max-width: 600px) {
+      header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .nav-links {
+        margin-top: 6px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>PentathlonScore – Live Results</h1>
+    <nav class="nav-links">
+      <a href="#">Home</a>
+      <a href="#">About</a>
+      <a href="#">Results</a>
+      <a href="#">Admin</a>
+    </nav>
+  </header>
+
+  <main>
+    <h2>Select Competition</h2>
+    <div class="controls">
+      <select id="competitionSelect">
+        <option value="">Any</option>
+        <option value="2025-charlotte-invitational">2025 Charlotte Invitational</option>
+        <option value="2024-usapm-nationals">2024 USA Pentathlon Nationals</option>
+        <option value="2024-colorado-regional">2024 Colorado Regional</option>
+      </select>
+      <button id="clearBtn">Clear</button>
+    </div>
+
+    <div id="resultsContainer">
+      <p class="no-results">Select a competition to view live results.</p>
+    </div>
+  </main>
+
+  <script>
+    // Helper: format discipline cells
+    function formatFenceCell(fence) {
+      if (!fence) return "-";
+      return `${fence.victories}V ${fence.defeats}D (${fence.points})`;
+    }
+
+    function formatTimeCell(disc) {
+      if (!disc) return "-";
+      return `${disc.timeDisplay} (${disc.points})`;
+    }
+
+    // Data model:
+    // competitions[compId] = {
+    //   name, location, date,
+    //   categories: [
+    //     {
+    //       id, division, gender, label,
+    //       results: [
+    //         {
+    //           name, noc,
+    //           fence: { victories, defeats, points },
+    //           swim: { timeDisplay, points },
+    //           obstacle: { timeDisplay, points },
+    //           laserRun: { timeDisplay, points },
+    //           total, handicap
+    //         }
+    //       ]
+    //     }
+    //   ]
+    // }
+
+    const competitions = {
+      "2025-charlotte-invitational": {
+        name: "2025 Charlotte Invitational",
+        location: "Charlotte, NC",
+        date: "2025-03-08",
+        categories: [
+          {
+            id: "u15-men",
+            division: "U15",
+            gender: "Men",
+            label: "U15 Men",
+            results: [
+              {
+                name: "Luke Filar",
+                noc: "USA",
+                fence: { victories: 10, defeats: 5, points: 250 },
+                swim: { timeDisplay: "2:15.23", points: 285 },
+                obstacle: { timeDisplay: "0:39.80", points: 270 },
+                laserRun: { timeDisplay: "7:10.50", points: 300 },
+                total: 1105,
+                handicap: "+0:00"
+              },
+              {
+                name: "Athlete X",
+                noc: "USA",
+                fence: { victories: 9, defeats: 6, points: 235 },
+                swim: { timeDisplay: "2:18.10", points: 275 },
+                obstacle: { timeDisplay: "0:41.20", points: 260 },
+                laserRun: { timeDisplay: "7:18.00", points: 290 },
+                total: 1060,
+                handicap: "+0:15"
+              }
+            ]
+          },
+          {
+            id: "u15-women",
+            division: "U15",
+            gender: "Women",
+            label: "U15 Women",
+            results: [
+              {
+                name: "Athlete Y",
+                noc: "USA",
+                fence: { victories: 8, defeats: 7, points: 220 },
+                swim: { timeDisplay: "2:25.00", points: 260 },
+                obstacle: { timeDisplay: "0:43.10", points: 250 },
+                laserRun: { timeDisplay: "7:35.40", points: 280 },
+                total: 1010,
+                handicap: "+0:25"
+              }
+            ]
+          }
+        ]
+      },
+
+      "2024-usapm-nationals": {
+        name: "2024 USA Pentathlon Nationals",
+        location: "TBD",
+        date: "2024-06-22",
+        categories: [
+          {
+            id: "senior-men",
+            division: "Senior",
+            gender: "Men",
+            label: "Senior Men",
+            results: [
+              {
+                name: "Athlete A",
+                noc: "USA",
+                fence: { victories: 18, defeats: 7, points: 260 },
+                swim: { timeDisplay: "2:10.00", points: 300 },
+                obstacle: { timeDisplay: "0:38.50", points: 280 },
+                laserRun: { timeDisplay: "6:58.00", points: 310 },
+                total: 1150,
+                handicap: "+0:00"
+              },
+              {
+                name: "Athlete B",
+                noc: "USA",
+                fence: { victories: 15, defeats: 10, points: 240 },
+                swim: { timeDisplay: "2:13.80", points: 290 },
+                obstacle: { timeDisplay: "0:40.20", points: 270 },
+                laserRun: { timeDisplay: "7:05.20", points: 300 },
+                total: 1100,
+                handicap: "+0:12"
+              }
+            ]
+          },
+          {
+            id: "senior-women",
+            division: "Senior",
+            gender: "Women",
+            label: "Senior Women",
+            results: [
+              {
+                name: "Athlete C",
+                noc: "USA",
+                fence: { victories: 16, defeats: 9, points: 250 },
+                swim: { timeDisplay: "2:18.50", points: 280 },
+                obstacle: { timeDisplay: "0:42.00", points: 265 },
+                laserRun: { timeDisplay: "7:12.10", points: 295 },
+                total: 1090,
+                handicap: "+0:00"
+              }
+            ]
+          }
+        ]
+      },
+
+      "2024-colorado-regional": {
+        name: "2024 Colorado Regional",
+        location: "Colorado Springs, CO",
+        date: "2024-03-16",
+        categories: [
+          {
+            id: "u19-men",
+            division: "U19",
+            gender: "Men",
+            label: "U19 Men",
+            results: [
+              {
+                name: "Athlete D",
+                noc: "USA",
+                fence: { victories: 12, defeats: 8, points: 240 },
+                swim: { timeDisplay: "2:17.00", points: 280 },
+                obstacle: { timeDisplay: "0:40.90", points: 265 },
+                laserRun: { timeDisplay: "7:08.70", points: 295 },
+                total: 1080,
+                handicap: "+0:00"
+              }
+            ]
+          }
+        ]
+      }
+    };
+
+    const selectEl = document.getElementById("competitionSelect");
+    const clearBtn = document.getElementById("clearBtn");
+    const resultsContainer = document.getElementById("resultsContainer");
+
+    function buildCategoryTable(category) {
+      const results = category.results || [];
+
+      if (results.length === 0) {
+        return `
+          <div class="category-block">
+            <div class="category-title">${category.label}</div>
+            <div class="no-results">No results entered yet for this category.</div>
+          </div>
+        `;
+      }
+
+      // Sort by total points (desc) and assign rank
+      const sorted = [...results].sort((a, b) => b.total - a.total)
+        .map((r, index) => ({
+          rank: index + 1,
+          ...r
+        }));
+
+      const rowsHtml = sorted.map(r => `
+        <tr>
+          <td>${r.rank}</td>
+          <td>${r.name}</td>
+          <td>${r.noc}</td>
+          <td>${formatFenceCell(r.fence)}</td>
+          <td>${formatTimeCell(r.swim)}</td>
+          <td>${formatTimeCell(r.obstacle)}</td>
+          <td>${formatTimeCell(r.laserRun)}</td>
+          <td>${r.total}</td>
+          <td>${r.handicap}</td>
+        </tr>
+      `).join("");
+
+      return `
+        <div class="category-block">
+          <div class="category-title">${category.label}</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Name</th>
+                <th>NOC</th>
+                <th>Fence</th>
+                <th>Swim</th>
+                <th>Obstacle</th>
+                <th>Laser Run</th>
+                <th>Total</th>
+                <th>Handicap</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function renderResults(compId) {
+      const comp = competitions[compId];
+
+      if (!comp) {
+        resultsContainer.innerHTML = '<p class="no-results">Select a competition to view live results.</p>';
+        return;
+      }
+
+      if (!comp.categories || comp.categories.length === 0) {
+        resultsContainer.innerHTML = `
+          <div class="results-header">
+            <strong>${comp.name}</strong>
+            <span>${comp.location ? " – " + comp.location : ""} ${comp.date ? " (" + comp.date + ")" : ""}</span>
+          </div>
+          <p class="no-results">No categories configured yet for this competition.</p>
+        `;
+        return;
+      }
+
+      const sortedCategories = [...comp.categories].sort((a, b) => {
+        if (a.division === b.division) {
+          return a.gender.localeCompare(b.gender);
+        }
+        return a.division.localeCompare(b.division);
+      });
+
+      const categoriesHtml = sortedCategories.map(buildCategoryTable).join("");
+
+      resultsContainer.innerHTML = `
+        <div class="results-header">
+          <strong>${comp.name}</strong>
+          <span>${comp.location ? " – " + comp.location : ""} ${comp.date ? " (" + comp.date + ")" : ""}</span>
+        </div>
+        ${categoriesHtml}
+      `;
+    }
+
+    selectEl.addEventListener("change", () => {
+      const compId = selectEl.value;
+      if (compId) {
+        renderResults(compId);
+      } else {
+        resultsContainer.innerHTML = '<p class="no-results">Select a competition to view live results.</p>';
+      }
+    });
+
+    clearBtn.addEventListener("click", () => {
+      selectEl.value = "";
+      resultsContainer.innerHTML = '<p class="no-results">Select a competition to view live results.</p>';
+    });
+  </script>
+</body>
+</html>
+
+
