@@ -359,10 +359,6 @@
               <label for="ath-noc">NOC</label>
               <input id="ath-noc" type="text" placeholder="e.g., USA" />
             </div>
-            <div>
-              <label for="ath-bib">Bib number</label>
-              <input id="ath-bib" type="text" placeholder="e.g., 12" />
-            </div>
           </div>
           <button type="submit" class="primary" id="athlete-submit-btn">Add athlete to division</button>
           <button type="button" class="btn-secondary" id="athlete-cancel-edit-btn" style="display:none;">Cancel edit</button>
@@ -463,7 +459,6 @@
       document.getElementById("ath-first-name").value = firstName || "";
       document.getElementById("ath-last-name").value = lastName || "";
       document.getElementById("ath-noc").value = noc || "";
-      document.getElementById("ath-bib").value = bib || "";
       athleteSubmitBtn.textContent = "Save athlete changes";
       athleteCancelEditBtn.style.display = "inline-block";
       athleteModeLabel.textContent = "Editing existing athlete in this division";
@@ -635,7 +630,6 @@
             firstName,
             lastName,
             noc,
-            bib
           });
         });
       });
@@ -654,7 +648,6 @@
           <tr>
             <td>${fullName || ""}</td>
             <td>${a.noc || ""}</td>
-            <td>${e.bib_number || ""}</td>
             <td>${e.created_at ? e.created_at.slice(0, 10) : ""}</td>
             <td>
               <button
@@ -665,7 +658,6 @@
                 data-first-name="${a.first_name || ""}"
                 data-last-name="${a.last_name || ""}"
                 data-noc="${a.noc || ""}"
-                data-bib="${e.bib_number || ""}"
               >
                 Edit
               </button>
@@ -687,7 +679,6 @@
             <tr>
               <th>Name</th>
               <th>NOC</th>
-              <th>Bib</th>
               <th>Added</th>
               <th>Actions</th>
             </tr>
@@ -923,7 +914,6 @@
       const firstName = document.getElementById("ath-first-name").value.trim();
       const lastName = document.getElementById("ath-last-name").value.trim();
       const noc = document.getElementById("ath-noc").value.trim();
-      const bib = document.getElementById("ath-bib").value.trim();
 
       if (!firstName || !lastName) {
         setAthleteFormMessage("First and last name are required.", "error");
@@ -942,17 +932,6 @@
         if (athleteUpdateError) {
           console.error(athleteUpdateError);
           setAthleteFormMessage("Failed to update athlete: " + (athleteUpdateError.message || ""), "error");
-          return;
-        }
-
-        const { error: entryUpdateError } = await supabase
-          .from("entries")
-          .update({ bib_number: bib || null })
-          .eq("id", editingEntryId);
-
-        if (entryUpdateError) {
-          console.error(entryUpdateError);
-          setAthleteFormMessage("Athlete updated, but failed to update entry: " + (entryUpdateError.message || ""), "error");
           return;
         }
 
@@ -988,8 +967,7 @@
           competition_id: Number(compId),
           division_id: Number(divisionId),
           athlete_id: newAthlete.id,
-          bib_number: bib || null
-        });
+          });
 
       if (entryError) {
         console.error(entryError);
