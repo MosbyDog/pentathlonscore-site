@@ -160,9 +160,10 @@
   <header>
     <h1>PentathlonScore – Live Results</h1>
     <nav class="nav-links">
-      <a href="#">Home</a>
-      <a href="#">Results</a>
-      <a href="#">Admin</a>
+      <a href="/">Home</a>
+      <a href="#">About</a>
+      <a href="/">Results</a>
+      <a href="/admin-login.html">Admin</a>
     </nav>
   </header>
 
@@ -170,10 +171,7 @@
     <h2>Select Competition</h2>
     <div class="controls">
       <select id="competitionSelect">
-        <option value="">Any</option>
-        <option value="2025-charlotte-invitational">2025 Charlotte Invitational</option>
-        <option value="2024-usapm-nationals">2024 USA Pentathlon Nationals</option>
-        <option value="2024-colorado-regional">2024 Colorado Regional</option>
+        <option value="">Select a competition</option>
       </select>
       <button id="clearBtn">Clear</button>
     </div>
@@ -183,208 +181,60 @@
     </div>
   </main>
 
+  <!-- Supabase client -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script>
-    // Helper: format discipline cells
-    function formatFenceCell(fence) {
-      if (!fence) return "-";
-      return `${fence.victories}V ${fence.defeats}D (${fence.points})`;
-    }
+    // TODO: replace with your real Supabase project values
+    const SUPABASE_URL = "https://cbwifmgrekugoljcaqoh.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNid2lmbWdyZWt1Z29samNhcW9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3MDcxODYsImV4cCI6MjA4MDI4MzE4Nn0.Rp5MCWYQL9SxbnBEJ7e76gbbd95qsStaLE2Hkhpn47g";
 
-    function formatTimeCell(disc) {
-      if (!disc) return "-";
-      return `${disc.timeDisplay} (${disc.points})`;
-    }
-
-    // Data model:
-    // competitions[compId] = {
-    //   name, location, date,
-    //   categories: [
-    //     {
-    //       id, division, gender, label,
-    //       results: [
-    //         {
-    //           name, noc,
-    //           fence: { victories, defeats, points },
-    //           swim: { timeDisplay, points },
-    //           obstacle: { timeDisplay, points },
-    //           laserRun: { timeDisplay, points },
-    //           total, handicap
-    //         }
-    //       ]
-    //     }
-    //   ]
-    // }
-
-    const competitions = {
-      "2025-charlotte-invitational": {
-        name: "2025 Charlotte Invitational",
-        location: "Charlotte, NC",
-        date: "2025-03-08",
-        categories: [
-          {
-            id: "u15-men",
-            division: "U15",
-            gender: "Men",
-            label: "U15 Men",
-            results: [
-              {
-                name: "Bob Smith",
-                noc: "USA",
-                fence: { victories: 10, defeats: 5, points: 250 },
-                swim: { timeDisplay: "2:15.23", points: 285 },
-                obstacle: { timeDisplay: "0:39.80", points: 270 },
-                laserRun: { timeDisplay: "7:10.50", points: 300 },
-                total: 1105,
-                handicap: "+0:00"
-              },
-              {
-                name: "Athlete X",
-                noc: "USA",
-                fence: { victories: 9, defeats: 6, points: 235 },
-                swim: { timeDisplay: "2:18.10", points: 275 },
-                obstacle: { timeDisplay: "0:41.20", points: 260 },
-                laserRun: { timeDisplay: "7:18.00", points: 290 },
-                total: 1060,
-                handicap: "+0:15"
-              }
-            ]
-          },
-          {
-            id: "u15-women",
-            division: "U15",
-            gender: "Women",
-            label: "U15 Women",
-            results: [
-              {
-                name: "Athlete Y",
-                noc: "USA",
-                fence: { victories: 8, defeats: 7, points: 220 },
-                swim: { timeDisplay: "2:25.00", points: 260 },
-                obstacle: { timeDisplay: "0:43.10", points: 250 },
-                laserRun: { timeDisplay: "7:35.40", points: 280 },
-                total: 1010,
-                handicap: "+0:25"
-              }
-            ]
-          }
-        ]
-      },
-
-      "2024-usapm-nationals": {
-        name: "2024 USA Pentathlon Nationals",
-        location: "TBD",
-        date: "2024-06-22",
-        categories: [
-          {
-            id: "senior-men",
-            division: "Senior",
-            gender: "Men",
-            label: "Senior Men",
-            results: [
-              {
-                name: "Athlete A",
-                noc: "USA",
-                fence: { victories: 18, defeats: 7, points: 260 },
-                swim: { timeDisplay: "2:10.00", points: 300 },
-                obstacle: { timeDisplay: "0:38.50", points: 280 },
-                laserRun: { timeDisplay: "6:58.00", points: 310 },
-                total: 1150,
-                handicap: "+0:00"
-              },
-              {
-                name: "Athlete B",
-                noc: "USA",
-                fence: { victories: 15, defeats: 10, points: 240 },
-                swim: { timeDisplay: "2:13.80", points: 290 },
-                obstacle: { timeDisplay: "0:40.20", points: 270 },
-                laserRun: { timeDisplay: "7:05.20", points: 300 },
-                total: 1100,
-                handicap: "+0:12"
-              }
-            ]
-          },
-          {
-            id: "senior-women",
-            division: "Senior",
-            gender: "Women",
-            label: "Senior Women",
-            results: [
-              {
-                name: "Athlete C",
-                noc: "USA",
-                fence: { victories: 16, defeats: 9, points: 250 },
-                swim: { timeDisplay: "2:18.50", points: 280 },
-                obstacle: { timeDisplay: "0:42.00", points: 265 },
-                laserRun: { timeDisplay: "7:12.10", points: 295 },
-                total: 1090,
-                handicap: "+0:00"
-              }
-            ]
-          }
-        ]
-      },
-
-      "2024-colorado-regional": {
-        name: "2024 Colorado Regional",
-        location: "Colorado Springs, CO",
-        date: "2024-03-16",
-        categories: [
-          {
-            id: "u19-men",
-            division: "U19",
-            gender: "Men",
-            label: "U19 Men",
-            results: [
-              {
-                name: "Athlete D",
-                noc: "USA",
-                fence: { victories: 12, defeats: 8, points: 240 },
-                swim: { timeDisplay: "2:17.00", points: 280 },
-                obstacle: { timeDisplay: "0:40.90", points: 265 },
-                laserRun: { timeDisplay: "7:08.70", points: 295 },
-                total: 1080,
-                handicap: "+0:00"
-              }
-            ]
-          }
-        ]
-      }
-    };
+    const { createClient } = window.supabase;
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const selectEl = document.getElementById("competitionSelect");
     const clearBtn = document.getElementById("clearBtn");
     const resultsContainer = document.getElementById("resultsContainer");
 
-    function buildCategoryTable(category) {
-      const results = category.results || [];
+    function placeholderDisciplineCell() {
+      // For now, we haven't wired scores yet
+      return "-";
+    }
 
-      if (results.length === 0) {
+    function buildCategoryTable(category) {
+      const entries = category.entries || [];
+      if (entries.length === 0) {
         return `
           <div class="category-block">
             <div class="category-title">${category.label}</div>
-            <div class="no-results">No results entered yet for this category.</div>
+            <div class="no-results">No athletes entered yet for this division.</div>
           </div>
         `;
       }
 
-      // Sort by total points (desc) and assign rank
-      const sorted = [...results].sort((a, b) => b.total - a.total)
-        .map((r, index) => ({
+      // Sort by athlete last name (or just stable order) for now;
+      // once we add results, we'll sort by total points.
+      const sorted = [...entries].map((e, index) => {
+        const a = e.athletes || e.athlete || {};
+        const fullName = [a.first_name, a.last_name].filter(Boolean).join(" ");
+        return {
           rank: index + 1,
-          ...r
-        }));
+          name: fullName,
+          noc: a.noc || "",
+          bib: e.bib_number || ""
+        };
+      });
 
       const rowsHtml = sorted.map(r => `
         <tr>
           <td>${r.rank}</td>
           <td>${r.name}</td>
           <td>${r.noc}</td>
-          <td>${formatFenceCell(r.fence)}</td>
-          <td>${formatTimeCell(r.swim)}</td>
-          <td>${formatTimeCell(r.obstacle)}</td>
-          <td>${formatTimeCell(r.laserRun)}</td>
-          <td>${r.total}</td>
-          <td>${r.handicap}</td>
+          <td>${placeholderDisciplineCell()}</td>
+          <td>${placeholderDisciplineCell()}</td>
+          <td>${placeholderDisciplineCell()}</td>
+          <td>${placeholderDisciplineCell()}</td>
+          <td>-</td>
+          <td>-</td>
         </tr>
       `).join("");
 
@@ -413,30 +263,37 @@
       `;
     }
 
-    function renderResults(compId) {
-      const comp = competitions[compId];
+    function formatDate(d) {
+      if (!d) return "";
+      return d; // YYYY-MM-DD
+    }
 
+    function renderResults(comp, categories) {
       if (!comp) {
         resultsContainer.innerHTML = '<p class="no-results">Select a competition to view live results.</p>';
         return;
       }
 
-      if (!comp.categories || comp.categories.length === 0) {
+      if (!categories || categories.length === 0) {
         resultsContainer.innerHTML = `
           <div class="results-header">
             <strong>${comp.name}</strong>
-            <span>${comp.location ? " – " + comp.location : ""} ${comp.date ? " (" + comp.date + ")" : ""}</span>
+            <span>${comp.location ? " – " + comp.location : ""} ${comp.start_date ? " (" + comp.start_date + ")" : ""}</span>
           </div>
-          <p class="no-results">No categories configured yet for this competition.</p>
+          <p class="no-results">No divisions configured yet for this competition.</p>
         `;
         return;
       }
 
-      const sortedCategories = [...comp.categories].sort((a, b) => {
-        if (a.division === b.division) {
-          return a.gender.localeCompare(b.gender);
-        }
-        return a.division.localeCompare(b.division);
+      const sortedCategories = [...categories].sort((a, b) => {
+        // Sort by age_group then gender then name
+        const agA = (a.age_group || "").toLowerCase();
+        const agB = (b.age_group || "").toLowerCase();
+        if (agA !== agB) return agA.localeCompare(agB);
+        const gA = (a.gender || "").toLowerCase();
+        const gB = (b.gender || "").toLowerCase();
+        if (gA !== gB) return gA.localeCompare(gB);
+        return a.label.localeCompare(b.label);
       });
 
       const categoriesHtml = sortedCategories.map(buildCategoryTable).join("");
@@ -444,27 +301,118 @@
       resultsContainer.innerHTML = `
         <div class="results-header">
           <strong>${comp.name}</strong>
-          <span>${comp.location ? " – " + comp.location : ""} ${comp.date ? " (" + comp.date + ")" : ""}</span>
+          <span>${comp.location ? " – " + comp.location : ""} ${comp.start_date ? " (" + formatDate(comp.start_date) + ")" : ""}</span>
         </div>
         ${categoriesHtml}
       `;
     }
 
+    async function loadCompetitions() {
+      // Load all competitions (draft/live/finished) so you can see your test one too.
+      const { data, error } = await supabase
+        .from("competitions")
+        .select("*")
+        .order("start_date", { ascending: false });
+
+      if (error) {
+        console.error("Error loading competitions", error);
+        resultsContainer.innerHTML = '<p class="no-results">Failed to load competitions.</p>';
+        return;
+      }
+
+      // Populate dropdown
+      selectEl.innerHTML = '<option value="">Select a competition</option>';
+      (data || []).forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c.id;
+        opt.textContent = c.name;
+        selectEl.appendChild(opt);
+      });
+
+      if (!data || data.length === 0) {
+        resultsContainer.innerHTML = '<p class="no-results">No competitions created yet.</p>';
+      }
+    }
+
+    async function loadCompetitionWithDivisionsAndEntries(compId) {
+      if (!compId) {
+        renderResults(null, []);
+        return;
+      }
+
+      // Get competition info
+      const { data: comps, error: compError } = await supabase
+        .from("competitions")
+        .select("*")
+        .eq("id", compId)
+        .limit(1);
+
+      if (compError || !comps || comps.length === 0) {
+        console.error("Error loading competition", compError);
+        resultsContainer.innerHTML = '<p class="no-results">Failed to load competition.</p>';
+        return;
+      }
+
+      const competition = comps[0];
+
+      // Get divisions + entries + athletes
+      const { data: divisions, error: divError } = await supabase
+        .from("divisions")
+        .select(`
+          id,
+          name,
+          age_group,
+          gender,
+          entries (
+            id,
+            bib_number,
+            created_at,
+            athletes (
+              first_name,
+              last_name,
+              noc
+            )
+          )
+        `)
+        .eq("competition_id", compId)
+        .order("order_index", { ascending: true })
+        .order("name", { ascending: true });
+
+      if (divError) {
+        console.error("Error loading divisions", divError);
+        resultsContainer.innerHTML = '<p class="no-results">Failed to load divisions.</p>';
+        return;
+      }
+
+      const categories = (divisions || []).map(d => ({
+        id: d.id,
+        label: d.name,
+        age_group: d.age_group,
+        gender: d.gender,
+        entries: d.entries || []
+      }));
+
+      renderResults(competition, categories);
+    }
+
     selectEl.addEventListener("change", () => {
       const compId = selectEl.value;
       if (compId) {
-        renderResults(compId);
+        loadCompetitionWithDivisionsAndEntries(Number(compId));
       } else {
-        resultsContainer.innerHTML = '<p class="no-results">Select a competition to view live results.</p>';
+        renderResults(null, []);
       }
     });
 
     clearBtn.addEventListener("click", () => {
       selectEl.value = "";
-      resultsContainer.innerHTML = '<p class="no-results">Select a competition to view live results.</p>';
+      renderResults(null, []);
     });
+
+    (async function init() {
+      await loadCompetitions();
+    })();
   </script>
 </body>
 </html>
-
 
