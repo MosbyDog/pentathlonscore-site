@@ -366,7 +366,8 @@
             <p class="note">
               Scoring settings (optional). Used for the <strong>Calc</strong> button in Results to auto-fill points.<br/>
               Time-based formula: <code>points = base_points + (base_time - actual_time) × points_per_second</code><br/>
-              Fence formula: <code>points = base_points + (victories - base_victories) × points_per_victory</code>
+              Fence formula: <code>points = base_points + (victories - base_victories) × points_per_victory</code><br/>
+              Diff is always rounded <strong>down</strong> to match UIPM-style brackets.
             </p>
             <div class="form-row">
               <div>
@@ -379,7 +380,7 @@
               </div>
               <div>
                 <label for="div-swim-pps">Swim points per second</label>
-                <input id="div-swim-pps" type="number" step="0.01" placeholder="e.g., 3" />
+                <input id="div-swim-pps" type="number" step="0.01" placeholder="e.g., 2" />
               </div>
             </div>
             <div class="form-row">
@@ -542,7 +543,6 @@
     const resultsContainer = document.getElementById("results-container");
 
     let competitionsCache = [];
-    // divisionsCacheByCompetition: { [competitionId: string]: DivisionRow[] }
     let divisionsCacheByCompetition = {};
     let editingEntryId = null;
     let editingAthleteId = null;
@@ -700,6 +700,16 @@
           </td>
           <td>${d.order_index ?? ""}</td>
           <td>${d.created_at ? d.created_at.slice(0, 10) : ""}</td>
+          <td>
+            <button
+              type="button"
+              class="btn-danger delete-division-btn"
+              data-division-id="${d.id}"
+              data-division-name="${d.name || ""}"
+            >
+              Delete
+            </button>
+          </td>
         </tr>
       `).join("");
 
@@ -711,11 +721,14 @@
               <th>Tags</th>
               <th>Order</th>
               <th>Created</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
         </table>
       `;
+
+      attachDivisionDeleteHandlers();
     }
 
     function populateAthleteDivisionSelect(divisions) {
@@ -945,22 +958,19 @@
       return null;
     }
 
-function calculateTimePoints(actualSeconds, baseSeconds, basePoints, perSecond) {
-  if (
-    actualSeconds == null ||
-    baseSeconds == null ||
-    basePoints == null ||
-    perSecond == null
-  ) return null;
+    // FIXED: use floor of diff to match UIPM-style brackets
+    function calculateTimePoints(actualSeconds, baseSeconds, basePoints, perSecond) {
+      if (
+        actualSeconds == null ||
+        baseSeconds == null ||
+        basePoints == null ||
+        perSecond == null
+      ) return null;
 
-  // diff = "how many points worth of time" they are faster (+) or slower (-)
-  const diff = (baseSeconds - actualSeconds) * perSecond;
-
-  // Always round DOWN the diff to match your examples
-  const pts = basePoints + Math.floor(diff);
-
-  return pts;
-}
+      const diff = (baseSeconds - actualSeconds) * perSecond;
+      const pts = basePoints + Math.floor(diff);
+      return pts;
+    }
 
     function parseFenceRecord(str) {
       if (!str) return null;
@@ -994,8 +1004,9 @@ function calculateTimePoints(actualSeconds, baseSeconds, basePoints, perSecond) 
       ) return null;
 
       const diff = record.victories - baseVictories;
-      const pts = basePoints + diff * perVictory;
-      return Math.round(pts);
+      const pts = basePoints + Math.floor(diff * perVictory / perVictory); // floor on diff (victories)
+      // simpler: pts = basePoints + Math.floor(diff) * perVictory if you want whole-victory steps only
+      return basePoints + Math.floor(diff) * perVictory;
     }
 
     async function calcResultsForEntry(entryId) {
@@ -1289,6 +1300,95 @@ function calculateTimePoints(actualSeconds, baseSeconds, basePoints, perSecond) 
       renderAthletes(data);
       setResultsListMessage("");
       renderResultsEditor(data);
+    }
+
+    // ---- Division delete ----
+    function attachDivisionDeleteHandlers() {
+      const buttons = divisionsContainer.querySelectorAll(".delete-division-btn");
+      buttons.forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const divisionId = Number(btn.dataset.divisionId);
+          const divisionName = btn.dataset.divisionName || "";
+          const compId = divisionCompSelect.value;
+          if (!divisionId || !compId) return;
+
+          const confirmMsg =
+            `Delete division "${divisionName}"?\n` +
+            `All athletes/entries and results in this division will also be deleted.`;
+          const ok = window.confirm(confirmMsg);
+          if (!ok) return;
+
+          setDivisionListMessage("Deleting division and related data...");
+
+          // 1) Load entries in this division
+          const { data: entries, error: entriesError } = await supabase
+            .from("entries")
+            .select("id")
+            .eq("division_id", divisionId);
+
+          if (entriesError) {
+            console.error(entriesError);
+            setDivisionListMessage("Failed to load entries for division.", "error");
+            return;
+          }
+
+          const entryIds = (entries || []).map(e => e.id);
+
+          // 2) Delete results for those entries (if any)
+          if (entryIds.length > 0) {
+            const { error: resultsError } = await supabase
+              .from("results")
+              .delete()
+              .in("entry_id", entryIds);
+
+            if (resultsError) {
+              console.error(resultsError);
+              setDivisionListMessage("Failed to delete results for division.", "error");
+              return;
+            }
+          }
+
+          // 3) Delete entries for this division
+          const { error: delEntriesError } = await supabase
+            .from("entries")
+            .delete()
+            .eq("division_id", divisionId);
+
+          if (delEntriesError) {
+            console.error(delEntriesError);
+            setDivisionListMessage("Failed to delete entries for division.", "error");
+            return;
+          }
+
+          // 4) Delete the division itself
+          const { error: divError } = await supabase
+            .from("divisions")
+            .delete()
+            .eq("id", divisionId);
+
+          if (divError) {
+            console.error(divError);
+            setDivisionListMessage("Failed to delete division.", "error");
+            return;
+          }
+
+          setDivisionListMessage("Division deleted.", "success");
+
+          // Reload divisions for this competition and update caches + dropdown
+          const divisions = await loadDivisionsForCompetition(compId);
+          populateAthleteDivisionSelect(divisions);
+
+          // If the deleted division was currently selected in the Athletes section, clear it
+          if (Number(athleteDivSelect.value) === divisionId) {
+            athleteDivSelect.value = "";
+            athleteSection.style.display = "none";
+            athletesContainer.innerHTML = "";
+            resultsContainer.innerHTML = "";
+            setAthleteListMessage("Select a division to view athletes.");
+            setResultsListMessage("");
+          }
+        });
+      });
     }
 
     // Event handlers
