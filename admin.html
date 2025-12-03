@@ -445,8 +445,8 @@
     <div class="card">
       <h2>Athletes & Results</h2>
       <p class="note">
-        Select a competition and division, then add/edit athletes and enter results (raw + points) for each discipline.
-        You can use <strong>Calc</strong> to auto-fill points if scoring settings are set.
+        Select a competition and division, then add/edit athletes and enter results (raw & points) for each discipline.
+        Handicaps auto-calculate from total points (leader = 0).
       </p>
 
       <label for="athlete-comp-select">Competition</label>
@@ -493,8 +493,9 @@
         <div style="margin-top: 16px;">
           <h3 style="margin: 0; font-size: 1rem;">Results for division</h3>
           <p class="note">
-            Enter raw performance (e.g., "10V 5D", "2:18.50") and points for each discipline. Enter handicap (if used).
-            Click <strong>Calc</strong> to auto-fill points using the division scoring settings. Then click <strong>Save</strong>.
+            Enter raw performance (e.g., "10V 5D", "2:18.50") and points for each discipline.
+            Click <strong>Calc</strong> to auto-fill points using division scoring settings, then <strong>Save</strong>.
+            Handicaps are recalculated automatically for the whole division on save (1 point = 1 second).
           </p>
           <div id="results-list-message" class="message"></div>
           <div id="results-container"></div>
@@ -920,13 +921,31 @@
               <input class="results-input" id="laser-pts-${e.id}" type="number" step="1" placeholder="points" value="${laser?.points ?? ""}" />
             </td>
             <td>
-              <input class="results-input" id="handicap-${e.id}" type="number" step="1" placeholder="e.g., 0" value="${e.handicap ?? ""}" />
+              <input
+                class="results-input"
+                id="handicap-${e.id}"
+                type="number"
+                step="1"
+                placeholder="auto"
+                value="${e.handicap ?? ""}"
+                readonly
+              />
             </td>
             <td>
-              <button type="button" class="btn-secondary calc-results-btn" data-entry-id="${e.id}">
+              <button
+                type="button"
+                class="btn-secondary calc-results-btn"
+                data-entry-id="${e.id}"
+                data-division-id="${e.division_id}"
+              >
                 Calc
               </button>
-              <button type="button" class="btn-secondary save-results-btn" data-entry-id="${e.id}">
+              <button
+                type="button"
+                class="btn-secondary save-results-btn"
+                data-entry-id="${e.id}"
+                data-division-id="${e.division_id}"
+              >
                 Save
               </button>
             </td>
@@ -944,7 +963,7 @@
               <th>Swim<br/><span class="small-text">raw & points</span></th>
               <th>Obstacle<br/><span class="small-text">raw & points</span></th>
               <th>Laser Run<br/><span class="small-text">raw & points</span></th>
-              <th>Handicap<br/><span class="small-text">e.g., 0, 10</span></th>
+              <th>Handicap<br/><span class="small-text">auto (sec)</span></th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -1114,9 +1133,64 @@
       setResultsListMessage("Points calculated (not yet saved). Click Save to store.", "success");
     }
 
-    async function saveResultsForEntry(entryId) {
+    async function recalcHandicapsForDivision(divisionId) {
+      if (!divisionId) return;
+
+      // Get all entries + results for this division
+      const { data: allEntries, error } = await supabase
+        .from("entries")
+        .select(`
+          id,
+          results (discipline, points)
+        `)
+        .eq("division_id", divisionId);
+
+      if (error) {
+        console.error(error);
+        setResultsListMessage("Results saved, but failed to recalc handicaps: " + (error.message || ""), "error");
+        return;
+      }
+
+      if (!allEntries || allEntries.length === 0) {
+        return;
+      }
+
+      // Compute total points for each entry
+      const totals = allEntries.map(e => {
+        const resArr = e.results || [];
+        const total = resArr.reduce((sum, r) => {
+          return sum + (typeof r.points === "number" ? r.points : 0);
+        }, 0);
+        return { id: e.id, total };
+      });
+
+      const maxTotal = totals.reduce((max, t) => Math.max(max, t.total), 0);
+
+      // Update handicap = maxTotal - total (1 point = 1 second)
+      for (const t of totals) {
+        const handicap = maxTotal - t.total; // leader => 0, others positive
+        const { error: updErr } = await supabase
+          .from("entries")
+          .update({ handicap })
+          .eq("id", t.id);
+
+        if (updErr) {
+          console.error(updErr);
+          setResultsListMessage("Failed to update some handicaps: " + (updErr.message || ""), "error");
+          return;
+        }
+      }
+
+      setResultsListMessage("Results saved. Handicaps recalculated for this division.", "success");
+
+      // Reload athletes/results to show fresh handicaps
+      await loadAthletesForDivision(divisionId);
+    }
+
+    async function saveResultsForEntry(entryId, divisionId) {
       const id = Number(entryId);
-      if (!id) return;
+      const divIdNum = Number(divisionId);
+      if (!id || !divIdNum) return;
 
       const disciplines = ["fence", "swim", "obstacle", "laser"];
       const upserts = [];
@@ -1142,30 +1216,7 @@
         }
       });
 
-      const handicapEl = document.getElementById(`handicap-${id}`);
-      let handicapVal = null;
-      if (handicapEl) {
-        const hv = handicapEl.value.trim();
-        if (hv !== "") {
-          handicapVal = Number(hv);
-        }
-      }
-
       setResultsListMessage("Saving results...");
-
-      // First, update handicap on entries
-      if (handicapEl) {
-        const { error: handicapError } = await supabase
-          .from("entries")
-          .update({ handicap: handicapVal })
-          .eq("id", id);
-
-        if (handicapError) {
-          console.error(handicapError);
-          setResultsListMessage("Failed to save handicap: " + (handicapError.message || ""), "error");
-          return;
-        }
-      }
 
       // Delete empty disciplines
       for (const disc of deletes) {
@@ -1193,7 +1244,8 @@
         }
       }
 
-      setResultsListMessage("Results saved.", "success");
+      // Now recalc handicaps for entire division based on total points
+      await recalcHandicapsForDivision(divIdNum);
     }
 
     function attachResultsHandlers() {
@@ -1201,8 +1253,9 @@
       saveButtons.forEach(btn => {
         btn.addEventListener("click", async () => {
           const entryId = btn.dataset.entryId;
-          if (!entryId) return;
-          await saveResultsForEntry(entryId);
+          const divisionId = btn.dataset.divisionId;
+          if (!entryId || !divisionId) return;
+          await saveResultsForEntry(entryId, divisionId);
         });
       });
 
@@ -1297,6 +1350,7 @@
         .from("entries")
         .select(`
           id,
+          division_id,
           athlete_id,
           created_at,
           handicap,
@@ -1420,56 +1474,56 @@
 
     // ---- Division reordering ----
     function attachDivisionOrderHandlers() {
-  const buttons = divisionsContainer.querySelectorAll(".move-division-btn");
-  buttons.forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const divisionId = Number(btn.dataset.divisionId);
-      const direction = btn.dataset.direction;
-      const compId = divisionCompSelect.value;
-      if (!divisionId || !compId) return;
+      const buttons = divisionsContainer.querySelectorAll(".move-division-btn");
+      buttons.forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const divisionId = Number(btn.dataset.divisionId);
+          const direction = btn.dataset.direction;
+          const compId = divisionCompSelect.value;
+          if (!divisionId || !compId) return;
 
-      const currentList = sortedDivisionsForCompId(compId);
-      const idx = currentList.findIndex(d => d.id === divisionId);
-      if (idx === -1) return;
+          const currentList = sortedDivisionsForCompId(compId);
+          const idx = currentList.findIndex(d => d.id === divisionId);
+          if (idx === -1) return;
 
-      let newIndex = idx;
-      if (direction === "up" && idx > 0) newIndex = idx - 1;
-      if (direction === "down" && idx < currentList.length - 1) newIndex = idx + 1;
-      if (newIndex === idx) return; // nothing to do
+          let newIndex = idx;
+          if (direction === "up" && idx > 0) newIndex = idx - 1;
+          if (direction === "down" && idx < currentList.length - 1) newIndex = idx + 1;
+          if (newIndex === idx) return; // nothing to do
 
-      // Make a copy and swap in that copy
-      const swapped = currentList.slice();
-      const temp = swapped[idx];
-      swapped[idx] = swapped[newIndex];
-      swapped[newIndex] = temp;
+          // Make a copy and swap in that copy
+          const swapped = currentList.slice();
+          const temp = swapped[idx];
+          swapped[idx] = swapped[newIndex];
+          swapped[newIndex] = temp;
 
-      setDivisionListMessage("Updating division order...");
+          setDivisionListMessage("Updating division order...");
 
-      // Update order_index for each division one-by-one
-      for (let i = 0; i < swapped.length; i++) {
-        const d = swapped[i];
-        const { error } = await supabase
-          .from("divisions")
-          .update({ order_index: i + 1 })
-          .eq("id", d.id);
+          // Update order_index for each division one-by-one
+          for (let i = 0; i < swapped.length; i++) {
+            const d = swapped[i];
+            const { error } = await supabase
+              .from("divisions")
+              .update({ order_index: i + 1 })
+              .eq("id", d.id);
 
-        if (error) {
-          console.error(error);
-          setDivisionListMessage(
-            "Failed to update division order: " + (error.message || ""),
-            "error"
-          );
-          return;
-        }
-      }
+            if (error) {
+              console.error(error);
+              setDivisionListMessage(
+                "Failed to update division order: " + (error.message || ""),
+                "error"
+              );
+              return;
+            }
+          }
 
-      // Refresh cache, UI, and athlete division dropdown
-      const divisions = await loadDivisionsForCompetition(compId);
-      populateAthleteDivisionSelect(sortedDivisionsForCompId(compId));
-      setDivisionListMessage("Division order updated.", "success");
-    });
-  });
-}
+          // refresh cache, UI, and athlete division dropdown
+          const divisions = await loadDivisionsForCompetition(compId);
+          populateAthleteDivisionSelect(sortedDivisionsForCompId(compId));
+          setDivisionListMessage("Division order updated.", "success");
+        });
+      });
+    }
 
     // Event handlers
 
@@ -1732,3 +1786,4 @@
   </script>
 </body>
 </html>
+
