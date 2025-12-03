@@ -161,8 +161,6 @@
     <h1>PentathlonScore – Live Results</h1>
     <nav class="nav-links">
       <a href="/">Home</a>
-      <a href="#">About</a>
-      <a href="/">Results</a>
       <a href="/admin-login.html">Admin</a>
     </nav>
   </header>
@@ -265,7 +263,6 @@
         }
         if (aHas && !bHas) return -1;
         if (!aHas && bHas) return 1;
-        // fallback: sort by name
         return a.name.localeCompare(b.name);
       });
 
@@ -352,6 +349,7 @@
       const { data, error } = await supabase
         .from("competitions")
         .select("*")
+        .in("status", ["live", "finished"])
         .order("start_date", { ascending: false });
 
       if (error) {
@@ -369,7 +367,7 @@
       });
 
       if (!data || data.length === 0) {
-        resultsContainer.innerHTML = '<p class="no-results">No competitions created yet.</p>';
+        resultsContainer.innerHTML = '<p class="no-results">No live or finished competitions available.</p>';
       }
     }
 
@@ -456,4 +454,3 @@
   </script>
 </body>
 </html>
-
