@@ -945,17 +945,22 @@
       return null;
     }
 
-    function calculateTimePoints(actualSeconds, baseSeconds, basePoints, perSecond) {
-      if (
-        actualSeconds == null ||
-        baseSeconds == null ||
-        basePoints == null ||
-        perSecond == null
-      ) return null;
+function calculateTimePoints(actualSeconds, baseSeconds, basePoints, perSecond) {
+  if (
+    actualSeconds == null ||
+    baseSeconds == null ||
+    basePoints == null ||
+    perSecond == null
+  ) return null;
 
-      const pts = basePoints + (baseSeconds - actualSeconds) * perSecond;
-      return Math.round(pts); // round to nearest point
-    }
+  // diff = "how many points worth of time" they are faster (+) or slower (-)
+  const diff = (baseSeconds - actualSeconds) * perSecond;
+
+  // Always round DOWN the diff to match your examples
+  const pts = basePoints + Math.floor(diff);
+
+  return pts;
+}
 
     function parseFenceRecord(str) {
       if (!str) return null;
