@@ -1420,56 +1420,56 @@
 
     // ---- Division reordering ----
     function attachDivisionOrderHandlers() {
-      const buttons = divisionsContainer.querySelectorAll(".move-division-btn");
-      buttons.forEach(btn => {
-        btn.addEventListener("click", async () => {
-          const divisionId = Number(btn.dataset.divisionId);
-          const direction = btn.dataset.direction;
-          const compId = divisionCompSelect.value;
-          if (!divisionId || !compId) return;
+  const buttons = divisionsContainer.querySelectorAll(".move-division-btn");
+  buttons.forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const divisionId = Number(btn.dataset.divisionId);
+      const direction = btn.dataset.direction;
+      const compId = divisionCompSelect.value;
+      if (!divisionId || !compId) return;
 
-          const currentList = sortedDivisionsForCompId(compId);
-          const idx = currentList.findIndex(d => d.id === divisionId);
-          if (idx === -1) return;
+      const currentList = sortedDivisionsForCompId(compId);
+      const idx = currentList.findIndex(d => d.id === divisionId);
+      if (idx === -1) return;
 
-          let newIndex = idx;
-          if (direction === "up" && idx > 0) newIndex = idx - 1;
-          if (direction === "down" && idx < currentList.length - 1) newIndex = idx + 1;
+      let newIndex = idx;
+      if (direction === "up" && idx > 0) newIndex = idx - 1;
+      if (direction === "down" && idx < currentList.length - 1) newIndex = idx + 1;
+      if (newIndex === idx) return; // nothing to do
 
-          if (newIndex === idx) {
-            return; // nothing to do
-          }
+      // Make a copy and swap in that copy
+      const swapped = currentList.slice();
+      const temp = swapped[idx];
+      swapped[idx] = swapped[newIndex];
+      swapped[newIndex] = temp;
 
-          // swap positions in array
-          const temp = currentList[idx];
-          currentList[idx] = currentList[newIndex];
-          currentList[newIndex] = temp;
+      setDivisionListMessage("Updating division order...");
 
-          // recompute order_index 1..N
-          const payload = currentList.map((d, i) => ({
-            id: d.id,
-            order_index: i + 1
-          }));
+      // Update order_index for each division one-by-one
+      for (let i = 0; i < swapped.length; i++) {
+        const d = swapped[i];
+        const { error } = await supabase
+          .from("divisions")
+          .update({ order_index: i + 1 })
+          .eq("id", d.id);
 
-          setDivisionListMessage("Updating division order...");
+        if (error) {
+          console.error(error);
+          setDivisionListMessage(
+            "Failed to update division order: " + (error.message || ""),
+            "error"
+          );
+          return;
+        }
+      }
 
-          const { error } = await supabase
-            .from("divisions")
-            .upsert(payload, { onConflict: "id" });
-
-          if (error) {
-            console.error(error);
-            setDivisionListMessage("Failed to update division order: " + (error.message || ""), "error");
-            return;
-          }
-
-          // refresh cache, UI, and athlete division dropdown
-          const divisions = await loadDivisionsForCompetition(compId);
-          populateAthleteDivisionSelect(sortedDivisionsForCompId(compId));
-          setDivisionListMessage("Division order updated.", "success");
-        });
-      });
-    }
+      // Refresh cache, UI, and athlete division dropdown
+      const divisions = await loadDivisionsForCompetition(compId);
+      populateAthleteDivisionSelect(sortedDivisionsForCompId(compId));
+      setDivisionListMessage("Division order updated.", "success");
+    });
+  });
+}
 
     // Event handlers
 
