@@ -202,6 +202,11 @@
       color: #991b1b;
     }
 
+    .tag.cancelled {
+      background: #e5e7eb;
+      color: #9f1239;
+    }
+
     .pill {
       display: inline-block;
       padding: 2px 6px;
@@ -287,12 +292,39 @@
       </form>
     </div>
 
-    <!-- List competitions -->
+    <!-- List competitions + status updater -->
     <div class="card">
       <h2>Competitions</h2>
       <p class="note">All competitions currently in the system.</p>
       <div id="list-message" class="message"></div>
       <div id="competitions-container"></div>
+
+      <div style="margin-top: 12px;">
+        <h3 style="margin: 0; font-size: 1rem;">Update competition status</h3>
+        <p class="note">
+          Only competitions with status <strong>Live</strong> or <strong>Finished</strong> appear on the public site.
+          Use <strong>Draft</strong> or <strong>Cancelled</strong> to hide them.
+        </p>
+        <div class="form-row">
+          <div>
+            <label for="status-comp-select">Competition</label>
+            <select id="status-comp-select">
+              <option value="">Select a competition</option>
+            </select>
+          </div>
+          <div>
+            <label for="status-select">Status</label>
+            <select id="status-select">
+              <option value="draft">Draft (hidden)</option>
+              <option value="live">Live (public)</option>
+              <option value="finished">Finished (public)</option>
+              <option value="cancelled">Cancelled (hidden)</option>
+            </select>
+          </div>
+        </div>
+        <button type="button" class="primary" id="status-update-btn">Update status</button>
+        <div id="status-update-message" class="message"></div>
+      </div>
     </div>
 
     <!-- Divisions -->
@@ -414,6 +446,11 @@
     const listMsg = document.getElementById("list-message");
     const competitionsContainer = document.getElementById("competitions-container");
 
+    const statusCompSelect = document.getElementById("status-comp-select");
+    const statusSelect = document.getElementById("status-select");
+    const statusUpdateBtn = document.getElementById("status-update-btn");
+    const statusUpdateMsg = document.getElementById("status-update-message");
+
     const divisionCompSelect = document.getElementById("division-comp-select");
     const divisionSection = document.getElementById("division-section");
     const divisionForm = document.getElementById("division-form");
@@ -448,6 +485,11 @@
     function setListMessage(text, type = "info") {
       listMsg.textContent = text || "";
       listMsg.className = "message " + (type === "error" ? "error" : type === "success" ? "success" : "");
+    }
+
+    function setStatusUpdateMessage(text, type = "info") {
+      statusUpdateMsg.textContent = text || "";
+      statusUpdateMsg.className = "message " + (type === "error" ? "error" : type === "success" ? "success" : "");
     }
 
     function setDivisionFormMessage(text, type = "info") {
@@ -518,6 +560,7 @@
       let cls = "tag";
       if (s === "live") cls += " live";
       else if (s === "finished") cls += " finished";
+      else if (s === "cancelled") cls += " cancelled";
       else cls += " draft";
       return `<span class="${cls}">${s || "draft"}</span>`;
     }
@@ -534,6 +577,7 @@
         competitionsContainer.innerHTML = '<p class="note">No competitions found yet.</p>';
         divisionCompSelect.innerHTML = '<option value="">Select a competition</option>';
         athleteCompSelect.innerHTML = '<option value="">Select a competition</option>';
+        statusCompSelect.innerHTML = '<option value="">Select a competition</option>';
         return;
       }
 
@@ -568,6 +612,7 @@
       const options = list.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
       divisionCompSelect.innerHTML = baseOption + options;
       athleteCompSelect.innerHTML = baseOption + options;
+      statusCompSelect.innerHTML = baseOption + options;
     }
 
     function renderDivisions(divisions) {
@@ -709,7 +754,7 @@
           <thead>
             <tr>
               <th>Name</th>
-              <th>NOC</</th>
+              <th>NOC</th>
               <th>Added</th>
               <th>Actions</th>
             </tr>
@@ -808,7 +853,6 @@
         const ptsStr = ptsEl.value.trim();
 
         if (!raw && !ptsStr) {
-          // Clear result for this discipline
           deletes.push(disc);
         } else {
           upserts.push({
@@ -822,7 +866,6 @@
 
       setResultsListMessage("Saving results...");
 
-      // Delete empty ones
       for (const disc of deletes) {
         const { error } = await supabase
           .from("results")
@@ -874,6 +917,7 @@
         competitionsContainer.innerHTML = "";
         divisionCompSelect.innerHTML = '<option value="">Select a competition</option>';
         athleteCompSelect.innerHTML = '<option value="">Select a competition</option>';
+        statusCompSelect.innerHTML = '<option value="">Select a competition</option>';
         return;
       }
 
@@ -1009,6 +1053,30 @@
       await loadCompetitions();
     });
 
+    statusUpdateBtn.addEventListener("click", async () => {
+      const compId = statusCompSelect.value;
+      const newStatus = statusSelect.value;
+      if (!compId || !newStatus) {
+        setStatusUpdateMessage("Select a competition and a status.", "error");
+        return;
+      }
+
+      setStatusUpdateMessage("Updating status...");
+      const { error } = await supabase
+        .from("competitions")
+        .update({ status: newStatus })
+        .eq("id", compId);
+
+      if (error) {
+        console.error(error);
+        setStatusUpdateMessage("Failed to update status: " + (error.message || ""), "error");
+        return;
+      }
+
+      setStatusUpdateMessage("Status updated.", "success");
+      await loadCompetitions();
+    });
+
     divisionCompSelect.addEventListener("change", async () => {
       const compId = divisionCompSelect.value;
       if (!compId) {
@@ -1108,7 +1176,6 @@
         return;
       }
 
-      // EDIT MODE
       if (editingEntryId && editingAthleteId) {
         setAthleteFormMessage("Saving athlete changes...");
 
@@ -1130,7 +1197,6 @@
         return;
       }
 
-      // ADD MODE
       setAthleteFormMessage("Adding athlete...");
 
       const { data: newAthlete, error: athleteError } = await supabase
@@ -1174,6 +1240,7 @@
       setDivisionListMessage("Select a competition to view divisions.");
       setAthleteListMessage("Select competition and division to view athletes.");
       setResultsListMessage("");
+      setStatusUpdateMessage("");
     })();
   </script>
 </body>
