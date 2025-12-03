@@ -203,7 +203,7 @@
     }
 
     .tag.cancelled {
-      background: #e5e7eb;
+      background: #fce7f3;
       color: #9f1239;
     }
 
@@ -254,7 +254,7 @@
     <!-- Create competition -->
     <div class="card">
       <h2>Create Competition</h2>
-      <p class="note">Add a new competition. You can mark it as draft, live, or finished.</p>
+      <p class="note">Add a new competition. You can mark it as draft, live, finished, or cancelled.</p>
 
       <form id="competition-form">
         <div class="form-row">
@@ -283,6 +283,7 @@
               <option value="draft">Draft</option>
               <option value="live">Live</option>
               <option value="finished">Finished</option>
+              <option value="cancelled">Cancelled</option>
             </select>
           </div>
         </div>
@@ -422,7 +423,7 @@
         <div style="margin-top: 16px;">
           <h3 style="margin: 0; font-size: 1rem;">Results for division</h3>
           <p class="note">
-            Enter raw performance (e.g., "10V 5D", "2:18.50") and points for each discipline. Leave blank if no result yet.
+            Enter raw performance (e.g., "10V 5D", "2:18.50") and points for each discipline. Enter handicap (if used).
           </p>
           <div id="results-list-message" class="message"></div>
           <div id="results-container"></div>
@@ -808,6 +809,9 @@
               <input class="results-input" id="laser-pts-${e.id}" type="number" step="1" placeholder="points" value="${laser?.points ?? ""}" />
             </td>
             <td>
+              <input class="results-input" id="handicap-${e.id}" type="number" step="1" placeholder="e.g., 0" value="${e.handicap ?? ""}" />
+            </td>
+            <td>
               <button type="button" class="btn-secondary save-results-btn" data-entry-id="${e.id}">
                 Save
               </button>
@@ -826,6 +830,7 @@
               <th>Swim<br/><span class="small-text">raw & points</span></th>
               <th>Obstacle<br/><span class="small-text">raw & points</span></th>
               <th>Laser Run<br/><span class="small-text">raw & points</span></th>
+              <th>Handicap<br/><span class="small-text">e.g., 0, 10</span></th>
               <th>Save</th>
             </tr>
           </thead>
@@ -864,8 +869,32 @@
         }
       });
 
+      const handicapEl = document.getElementById(`handicap-${id}`);
+      let handicapVal = null;
+      if (handicapEl) {
+        const hv = handicapEl.value.trim();
+        if (hv !== "") {
+          handicapVal = Number(hv);
+        }
+      }
+
       setResultsListMessage("Saving results...");
 
+      // First, update handicap on entries
+      if (handicapEl) {
+        const { error: handicapError } = await supabase
+          .from("entries")
+          .update({ handicap: handicapVal })
+          .eq("id", id);
+
+        if (handicapError) {
+          console.error(handicapError);
+          setResultsListMessage("Failed to save handicap: " + (handicapError.message || ""), "error");
+          return;
+        }
+      }
+
+      // Delete empty disciplines
       for (const disc of deletes) {
         const { error } = await supabase
           .from("results")
@@ -879,6 +908,7 @@
         }
       }
 
+      // Upsert non-empty disciplines
       if (upserts.length > 0) {
         const { error } = await supabase
           .from("results")
@@ -987,6 +1017,7 @@
           id,
           athlete_id,
           created_at,
+          handicap,
           athletes (
             first_name,
             last_name,
@@ -1176,6 +1207,7 @@
         return;
       }
 
+      // EDIT MODE
       if (editingEntryId && editingAthleteId) {
         setAthleteFormMessage("Saving athlete changes...");
 
@@ -1197,6 +1229,7 @@
         return;
       }
 
+      // ADD MODE
       setAthleteFormMessage("Adding athlete...");
 
       const { data: newAthlete, error: athleteError } = await supabase
@@ -1245,3 +1278,4 @@
   </script>
 </body>
 </html>
+
