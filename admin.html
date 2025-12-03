@@ -333,6 +333,7 @@
       <h2>Divisions for Competition</h2>
       <p class="note">
         Select a competition, then add its age/gender divisions (e.g., U15 Men, U19 Women, Senior Men).
+        You can also reorder divisions to control how they appear on the public page.
       </p>
 
       <label for="division-comp-select">Competition</label>
@@ -408,7 +409,7 @@
               </div>
               <div>
                 <label for="div-laser-pps">Laser points per second</label>
-                <input id="div-laser-pps" type="number" step="0.01" value="1" placeholder="e.g., 2" />
+                <input id="div-laser-pps" type="number" step="0.01" value="1" placeholder="e.g., 1" />
               </div>
             </div>
             <div class="form-row">
@@ -433,6 +434,7 @@
 
         <div style="margin-top: 12px;">
           <h3 style="margin: 0; font-size: 1rem;">Divisions</h3>
+          <p class="note">Use Move Up / Move Down to reorder divisions for this competition.</p>
           <div id="division-list-message" class="message"></div>
           <div id="divisions-container"></div>
         </div>
@@ -685,6 +687,16 @@
       statusCompSelect.innerHTML = baseOption + options;
     }
 
+    function sortedDivisionsForCompId(compId) {
+      const list = divisionsCacheByCompetition[compId] || [];
+      return list.slice().sort((a,b) => {
+        const ao = a.order_index ?? 0;
+        const bo = b.order_index ?? 0;
+        if (ao !== bo) return ao - bo;
+        return (a.name || "").localeCompare(b.name || "");
+      });
+    }
+
     function renderDivisions(divisions) {
       if (!divisions || divisions.length === 0) {
         divisionsContainer.innerHTML = '<p class="note">No divisions added yet for this competition.</p>';
@@ -701,6 +713,22 @@
           <td>${d.order_index ?? ""}</td>
           <td>${d.created_at ? d.created_at.slice(0, 10) : ""}</td>
           <td>
+            <button
+              type="button"
+              class="btn-secondary move-division-btn"
+              data-division-id="${d.id}"
+              data-direction="up"
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              class="btn-secondary move-division-btn"
+              data-division-id="${d.id}"
+              data-direction="down"
+            >
+              ↓
+            </button>
             <button
               type="button"
               class="btn-danger delete-division-btn"
@@ -728,6 +756,7 @@
         </table>
       `;
 
+      attachDivisionOrderHandlers();
       attachDivisionDeleteHandlers();
     }
 
@@ -958,7 +987,7 @@
       return null;
     }
 
-    // FIXED: use floor of diff to match UIPM-style brackets
+    // Use floor of diff to match UIPM-style brackets
     function calculateTimePoints(actualSeconds, baseSeconds, basePoints, perSecond) {
       if (
         actualSeconds == null ||
@@ -1004,8 +1033,6 @@
       ) return null;
 
       const diff = record.victories - baseVictories;
-      const pts = basePoints + Math.floor(diff * perVictory / perVictory); // floor on diff (victories)
-      // simpler: pts = basePoints + Math.floor(diff) * perVictory if you want whole-victory steps only
       return basePoints + Math.floor(diff) * perVictory;
     }
 
@@ -1234,7 +1261,7 @@
 
       setDivisionListMessage("");
       divisionsCacheByCompetition[competitionId] = data;
-      renderDivisions(data);
+      renderDivisions(sortedDivisionsForCompId(competitionId));
       return data;
     }
 
@@ -1246,12 +1273,12 @@
 
       const cached = divisionsCacheByCompetition[competitionId];
       if (cached) {
-        populateAthleteDivisionSelect(cached);
+        populateAthleteDivisionSelect(sortedDivisionsForCompId(competitionId));
         return;
       }
 
       const divisions = await loadDivisionsForCompetition(competitionId);
-      populateAthleteDivisionSelect(divisions);
+      populateAthleteDivisionSelect(sortedDivisionsForCompId(competitionId));
     }
 
     async function loadAthletesForDivision(divisionId) {
@@ -1376,7 +1403,7 @@
 
           // Reload divisions for this competition and update caches + dropdown
           const divisions = await loadDivisionsForCompetition(compId);
-          populateAthleteDivisionSelect(divisions);
+          populateAthleteDivisionSelect(sortedDivisionsForCompId(compId));
 
           // If the deleted division was currently selected in the Athletes section, clear it
           if (Number(athleteDivSelect.value) === divisionId) {
@@ -1387,6 +1414,59 @@
             setAthleteListMessage("Select a division to view athletes.");
             setResultsListMessage("");
           }
+        });
+      });
+    }
+
+    // ---- Division reordering ----
+    function attachDivisionOrderHandlers() {
+      const buttons = divisionsContainer.querySelectorAll(".move-division-btn");
+      buttons.forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const divisionId = Number(btn.dataset.divisionId);
+          const direction = btn.dataset.direction;
+          const compId = divisionCompSelect.value;
+          if (!divisionId || !compId) return;
+
+          const currentList = sortedDivisionsForCompId(compId);
+          const idx = currentList.findIndex(d => d.id === divisionId);
+          if (idx === -1) return;
+
+          let newIndex = idx;
+          if (direction === "up" && idx > 0) newIndex = idx - 1;
+          if (direction === "down" && idx < currentList.length - 1) newIndex = idx + 1;
+
+          if (newIndex === idx) {
+            return; // nothing to do
+          }
+
+          // swap positions in array
+          const temp = currentList[idx];
+          currentList[idx] = currentList[newIndex];
+          currentList[newIndex] = temp;
+
+          // recompute order_index 1..N
+          const payload = currentList.map((d, i) => ({
+            id: d.id,
+            order_index: i + 1
+          }));
+
+          setDivisionListMessage("Updating division order...");
+
+          const { error } = await supabase
+            .from("divisions")
+            .upsert(payload, { onConflict: "id" });
+
+          if (error) {
+            console.error(error);
+            setDivisionListMessage("Failed to update division order: " + (error.message || ""), "error");
+            return;
+          }
+
+          // refresh cache, UI, and athlete division dropdown
+          const divisions = await loadDivisionsForCompetition(compId);
+          populateAthleteDivisionSelect(sortedDivisionsForCompId(compId));
+          setDivisionListMessage("Division order updated.", "success");
         });
       });
     }
@@ -1531,7 +1611,7 @@
       divisionForm.reset();
       document.getElementById("div-gender").value = "M";
       const divisions = await loadDivisionsForCompetition(competitionId);
-      populateAthleteDivisionSelect(divisions);
+      populateAthleteDivisionSelect(sortedDivisionsForCompId(competitionId));
     });
 
     athleteCompSelect.addEventListener("change", async () => {
