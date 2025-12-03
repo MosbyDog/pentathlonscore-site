@@ -5,17 +5,20 @@
   <title>PentathlonScore – Live Results</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
+    :root {
+      color-scheme: light dark;
+    }
     body {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       margin: 0;
       padding: 0;
-      background: #f4f4f7;
-      color: #222;
+      background: #f3f4f6;
+      color: #111827;
     }
 
     header {
       background: #111827;
-      color: #fff;
+      color: #f9fafb;
       padding: 10px 16px;
       display: flex;
       align-items: center;
@@ -23,108 +26,194 @@
       flex-wrap: wrap;
     }
 
-    header h1 {
-      font-size: 1.25rem;
-      margin: 0;
+    .logo {
+      font-weight: 600;
+      font-size: 1.1rem;
+      text-decoration: none;
+      color: #f9fafb;
     }
 
-    .nav-links {
+    nav {
       display: flex;
       gap: 12px;
-      font-size: 0.9rem;
-      flex-wrap: wrap;
+      margin-top: 6px;
     }
 
-    .nav-links a {
-      color: #cbd2ff;
+    .nav-link {
+      color: #e5e7eb;
       text-decoration: none;
+      font-size: 0.9rem;
+      padding: 4px 8px;
+      border-radius: 4px;
     }
 
-    .nav-links a:hover {
-      text-decoration: underline;
+    .nav-link:hover {
+      background: #1f2937;
+    }
+
+    .nav-link.active {
+      background: #4f46e5;
+      color: #f9fafb;
     }
 
     main {
       max-width: 1100px;
-      margin: 16px auto;
-      padding: 0 12px 32px;
+      margin: 16px auto 40px;
+      padding: 0 12px;
     }
 
-    h2 {
-      margin-top: 0;
-      font-size: 1.2rem;
-    }
-
-    .controls {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: center;
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 14px 14px 16px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.06);
       margin-bottom: 16px;
     }
 
-    select, button {
-      font-size: 0.95rem;
-      padding: 6px 10px;
+    h1 {
+      font-size: 1.4rem;
+      margin: 0 0 4px;
     }
 
-    button {
+    h2 {
+      font-size: 1.1rem;
+      margin: 0 0 4px;
+    }
+
+    h3 {
+      font-size: 1rem;
+      margin: 0 0 4px;
+    }
+
+    p {
+      margin: 4px 0;
+      font-size: 0.9rem;
+      color: #4b5563;
+    }
+
+    .note {
+      font-size: 0.85rem;
+      color: #6b7280;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      margin-bottom: 4px;
+      color: #374151;
+    }
+
+    select {
+      width: 100%;
+      max-width: 320px;
+      padding: 6px 8px;
+      font-size: 0.9rem;
       border-radius: 4px;
       border: 1px solid #d1d5db;
-      background: #e5e7eb;
-      cursor: pointer;
     }
 
-    button:hover {
-      background: #d4d7dd;
+    select:focus {
+      outline: none;
+      border-color: #6366f1;
+      box-shadow: 0 0 0 1px #6366f1;
     }
 
-    .results-header {
-      margin-bottom: 8px;
-      font-size: 0.95rem;
-      color: #333;
+    .message {
+      font-size: 0.85rem;
+      margin-top: 6px;
     }
 
-    .results-header span {
+    .message.error {
+      color: #b91c1c;
+    }
+
+    .message.info {
+      color: #6b7280;
+    }
+
+    .comp-meta {
+      font-size: 0.85rem;
       color: #4b5563;
-      font-size: 0.9rem;
+      margin-top: 6px;
     }
 
-    .category-block {
-      margin-top: 18px;
-      margin-bottom: 10px;
+    .pill {
+      display: inline-block;
+      padding: 2px 6px;
+      font-size: 0.75rem;
+      border-radius: 999px;
+      background: #e5e7eb;
+      color: #374151;
+      margin-right: 4px;
     }
 
-    .category-title {
-      font-weight: 600;
+    .pill.status-live {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .pill.status-finished {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .division-jump-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
       margin-bottom: 4px;
-      font-size: 0.98rem;
+    }
+
+    .division-jump-btn {
+      border: 1px solid #d1d5db;
+      background: #f9fafb;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      color: #111827;
+    }
+
+    .division-jump-btn:hover {
+      background: #e5e7eb;
+    }
+
+    .division-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .division-tags {
+      font-size: 0.8rem;
+      color: #6b7280;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      background: #fff;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-      border-radius: 4px;
-      overflow: hidden;
-      margin-bottom: 16px;
-    }
-
-    thead {
-      background: #1f2937;
-      color: #fff;
+      font-size: 0.85rem;
+      margin-top: 6px;
     }
 
     th, td {
       padding: 6px 8px;
-      font-size: 0.85rem;
-      text-align: center;
       border-bottom: 1px solid #e5e7eb;
+      text-align: right;
       white-space: nowrap;
     }
 
-    th:nth-child(2), td:nth-child(2) {
+    th {
+      background: #f9fafb;
+      font-weight: 600;
+      text-align: right;
+    }
+
+    th:first-child,
+    td:first-child {
       text-align: left;
     }
 
@@ -132,51 +221,64 @@
       background: #f9fafb;
     }
 
-    .no-results {
-      font-size: 0.95rem;
-      color: #555;
-      margin-top: 12px;
+    .rank-cell {
+      text-align: center;
+      font-weight: 600;
     }
 
-    @media (max-width: 800px) {
+    .name-cell {
+      font-weight: 500;
+    }
+
+    .noc-cell {
+      font-size: 0.8rem;
+      color: #6b7280;
+    }
+
+    .handicap-cell {
+      font-variant-numeric: tabular-nums;
+    }
+
+    @media (max-width: 640px) {
       th, td {
-        font-size: 0.75rem;
         padding: 4px 6px;
+        font-size: 0.8rem;
       }
-    }
-
-    @media (max-width: 600px) {
-      header {
+      .division-header {
         flex-direction: column;
         align-items: flex-start;
-      }
-      .nav-links {
-        margin-top: 6px;
       }
     }
   </style>
 </head>
 <body>
   <header>
-    <h1>PentathlonScore – Live Results</h1>
-    <nav class="nav-links">
-      <a href="/">Home</a>
-      <a href="/admin-login.html">Admin</a>
+    <a href="/" class="logo">PentathlonScore</a>
+    <nav>
+      <a href="/" class="nav-link active">Home</a>
+      <a href="/admin-login.html" class="nav-link">Admin</a>
     </nav>
   </header>
 
   <main>
-    <h2>Select Competition</h2>
-    <div class="controls">
-      <select id="competitionSelect">
+    <div class="card">
+      <h1>Live Results</h1>
+      <p class="note">
+        Select a competition to view division leaderboards. Results are updated live by the admin.
+      </p>
+
+      <label for="competition-select">Competition</label>
+      <select id="competition-select">
         <option value="">Select a competition</option>
       </select>
-      <button id="clearBtn">Clear</button>
+      <div id="competition-message" class="message info"></div>
+      <div id="competition-meta" class="comp-meta"></div>
+
+      <!-- Division quick-jump buttons -->
+      <div id="division-jump-container" class="division-jump-container"></div>
     </div>
 
-    <div id="resultsContainer">
-      <p class="no-results">Select a competition to view live results.</p>
-    </div>
+    <div id="leaderboard-container"></div>
   </main>
 
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
@@ -187,273 +289,314 @@
     const { createClient } = window.supabase;
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    const selectEl = document.getElementById("competitionSelect");
-    const clearBtn = document.getElementById("clearBtn");
-    const resultsContainer = document.getElementById("resultsContainer");
+    const competitionSelect = document.getElementById("competition-select");
+    const competitionMessage = document.getElementById("competition-message");
+    const competitionMeta = document.getElementById("competition-meta");
+    const divisionJumpContainer = document.getElementById("division-jump-container");
+    const leaderboardContainer = document.getElementById("leaderboard-container");
 
-    function formatDate(d) {
-      if (!d) return "";
-      return d;
+    let competitionsCache = [];
+
+    function setCompetitionMessage(text, type = "info") {
+      competitionMessage.textContent = text || "";
+      competitionMessage.className = "message " + type;
     }
 
-    function disciplineObj(resultsArr, disc) {
-      if (!resultsArr) return { raw: null, points: null };
-      const r = resultsArr.find(x => x.discipline === disc);
-      if (!r) return { raw: null, points: null };
-      return {
-        raw: r.raw_value || null,
-        points: r.points !== null && r.points !== undefined ? Number(r.points) : null
-      };
+    function formatStatusPill(status) {
+      const s = (status || "").toLowerCase();
+      let cls = "pill";
+      if (s === "live") cls += " status-live";
+      else if (s === "finished") cls += " status-finished";
+      return `<span class="${cls}">${s || ""}</span>`;
     }
 
-    function formatDisciplineCell(obj) {
-      if (!obj) return "-";
-      const hasRaw = obj.raw && obj.raw !== "";
-      const hasPts = obj.points !== null && !Number.isNaN(obj.points);
-      if (hasRaw && hasPts) return `${obj.raw} (${obj.points})`;
-      if (hasRaw) return obj.raw;
-      if (hasPts) return String(obj.points);
-      return "-";
+    function formatDateRange(start, end) {
+      if (!start && !end) return "";
+      if (start && !end) return start;
+      if (!start && end) return end;
+      if (start === end) return start;
+      return `${start} – ${end}`;
     }
 
-    function buildCategoryTable(category) {
-      const entries = category.entries || [];
-      if (entries.length === 0) {
-        return `
-          <div class="category-block">
-            <div class="category-title">${category.label}</div>
-            <div class="no-results">No athletes entered yet for this division.</div>
-          </div>
-        `;
-      }
+    function formatHandicap(seconds) {
+      if (seconds == null || isNaN(seconds)) return "";
+      const total = Math.round(Number(seconds)); // assume stored as seconds
+      const sign = total < 0 ? "-" : "";
+      const abs = Math.abs(total);
+      const m = Math.floor(abs / 60);
+      const s = abs % 60;
+      const sStr = s < 10 ? "0" + s : "" + s;
+      return sign + m + ":" + sStr;
+    }
 
-      const rowsData = entries.map((e) => {
+    function buildDivisionRows(division) {
+      const entries = division.entries || [];
+      const rows = entries.map(e => {
         const a = e.athletes || e.athlete || {};
-        const fullName = [a.first_name, a.last_name].filter(Boolean).join(" ");
         const resArr = e.results || [];
 
-        const fence = disciplineObj(resArr, "fence");
-        const swim = disciplineObj(resArr, "swim");
-        const obstacle = disciplineObj(resArr, "obstacle");
-        const laser = disciplineObj(resArr, "laser");
+        const ptsByDisc = { fence: null, swim: null, obstacle: null, laser: null };
+        resArr.forEach(r => {
+          if (r && r.discipline && ptsByDisc.hasOwnProperty(r.discipline)) {
+            ptsByDisc[r.discipline] = r.points;
+          }
+        });
 
-        const pointsList = [fence, swim, obstacle, laser]
-          .map(r => (r && r.points !== null && !Number.isNaN(r.points)) ? r.points : null);
+        const total = ["fence", "swim", "obstacle", "laser"].reduce((sum, d) => {
+          const val = ptsByDisc[d];
+          return sum + (typeof val === "number" ? val : 0);
+        }, 0);
 
-        const totalPoints = pointsList.reduce((sum, p) => (p !== null ? sum + p : sum), 0);
-        const hasAnyPoints = pointsList.some(p => p !== null);
-
-        const handicapVal =
-          e.handicap !== null && e.handicap !== undefined && !Number.isNaN(Number(e.handicap))
-            ? Number(e.handicap)
-            : null;
+        const first = a.first_name || "";
+        const last = a.last_name || "";
+        const name = (first + " " + last).trim();
 
         return {
           entryId: e.id,
-          name: fullName,
+          name,
           noc: a.noc || "",
-          fence,
-          swim,
-          obstacle,
-          laser,
-          totalPoints: hasAnyPoints ? totalPoints : null,
-          handicap: handicapVal
+          fence: ptsByDisc.fence,
+          swim: ptsByDisc.swim,
+          obstacle: ptsByDisc.obstacle,
+          laser: ptsByDisc.laser,
+          total,
+          handicap: e.handicap
         };
       });
 
-      rowsData.sort((a, b) => {
-        const aHas = a.totalPoints !== null;
-        const bHas = b.totalPoints !== null;
-        if (aHas && bHas) {
-          return b.totalPoints - a.totalPoints; // higher points first
-        }
-        if (aHas && !bHas) return -1;
-        if (!aHas && bHas) return 1;
+      // Sort by Total desc, then name asc
+      rows.sort((a, b) => {
+        if (b.total !== a.total) return b.total - a.total;
         return a.name.localeCompare(b.name);
       });
 
-      const rowsHtml = rowsData.map((r, idx) => {
-        const rank = r.totalPoints !== null ? (idx + 1) : "-";
-        const totalCell = r.totalPoints !== null ? r.totalPoints : "-";
-        const handicapCell = r.handicap !== null ? r.handicap : "-";
+      return rows;
+    }
 
+    function renderDivisionJumpButtons(competition) {
+      const divisions = (competition.divisions || [])
+        .slice()
+        .sort((a, b) => {
+          const ao = a.order_index ?? 0;
+          const bo = b.order_index ?? 0;
+          if (ao !== bo) return ao - bo;
+          return (a.name || "").localeCompare(b.name || "");
+        });
+
+      if (!divisions.length) {
+        divisionJumpContainer.innerHTML = "";
+        return;
+      }
+
+      const buttonsHtml = divisions.map(d => {
+        const label = d.name || "Division";
         return `
-          <tr>
-            <td>${rank}</td>
-            <td>${r.name}</td>
-            <td>${r.noc}</td>
-            <td>${formatDisciplineCell(r.fence)}</td>
-            <td>${formatDisciplineCell(r.swim)}</td>
-            <td>${formatDisciplineCell(r.obstacle)}</td>
-            <td>${formatDisciplineCell(r.laser)}</td>
-            <td>${totalCell}</td>
-            <td>${handicapCell}</td>
-          </tr>
+          <button
+            type="button"
+            class="division-jump-btn"
+            onclick="scrollToDivision('division-${d.id}')"
+          >
+            ${label}
+          </button>
         `;
       }).join("");
 
-      return `
-        <div class="category-block">
-          <div class="category-title">${category.label}</div>
-          <table>
-            <thead>
-              <tr>
-                <th>Rank</th>
-                <th>Name</th>
-                <th>NOC</th>
-                <th>Fence</th>
-                <th>Swim</th>
-                <th>Obstacle</th>
-                <th>Laser Run</th>
-                <th>Total</th>
-                <th>Handicap</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rowsHtml}
-            </tbody>
-          </table>
-        </div>
-      `;
+      divisionJumpContainer.innerHTML = buttonsHtml;
     }
 
-    function renderResults(comp, categories) {
-      if (!comp) {
-        resultsContainer.innerHTML = '<p class="no-results">Select a competition to view live results.</p>';
-      } else if (!categories || categories.length === 0) {
-        resultsContainer.innerHTML = `
-          <div class="results-header">
-            <strong>${comp.name}</strong>
-            <span>${comp.location ? " – " + comp.location : ""} ${comp.start_date ? " (" + formatDate(comp.start_date) + ")" : ""}</span>
-          </div>
-          <p class="no-results">No divisions configured yet for this competition.</p>
-        `;
-      } else {
-        const sortedCategories = [...categories].sort((a, b) => {
-          const agA = (a.age_group || "").toLowerCase();
-          const agB = (b.age_group || "").toLowerCase();
-          if (agA !== agB) return agA.localeCompare(agB);
-          const gA = (a.gender || "").toLowerCase();
-          const gB = (b.gender || "").toLowerCase();
-          if (gA !== gB) return gA.localeCompare(gB);
-          return a.label.localeCompare(b.label);
+    function renderCompetitionLeaderboards(competition) {
+      if (!competition) {
+        leaderboardContainer.innerHTML = "";
+        divisionJumpContainer.innerHTML = "";
+        competitionMeta.innerHTML = "";
+        return;
+      }
+
+      const statusHtml = formatStatusPill(competition.status);
+      const range = formatDateRange(competition.start_date, competition.end_date);
+      const location = competition.location || "";
+
+      competitionMeta.innerHTML = `
+        ${statusHtml}
+        ${location ? `<span class="pill">${location}</span>` : ""}
+        ${range ? `<span class="pill">${range}</span>` : ""}
+      `;
+
+      renderDivisionJumpButtons(competition);
+
+      const divisions = (competition.divisions || [])
+        .slice()
+        .sort((a, b) => {
+          const ao = a.order_index ?? 0;
+          const bo = b.order_index ?? 0;
+          if (ao !== bo) return ao - bo;
+          return (a.name || "").localeCompare(b.name || "");
         });
 
-        const categoriesHtml = sortedCategories.map(buildCategoryTable).join("");
-
-        resultsContainer.innerHTML = `
-          <div class="results-header">
-            <strong>${comp.name}</strong>
-            <span>${comp.location ? " – " + comp.location : ""} ${comp.start_date ? " (" + formatDate(comp.start_date) + ")" : ""}</span>
+      if (!divisions.length) {
+        leaderboardContainer.innerHTML = `
+          <div class="card">
+            <p class="note">No divisions have been added for this competition yet.</p>
           </div>
-          ${categoriesHtml}
         `;
+        return;
       }
+
+      const html = divisions.map(div => {
+        const rows = buildDivisionRows(div);
+        const tags = [];
+        if (div.age_group) tags.push(div.age_group);
+        if (div.gender) tags.push(div.gender);
+
+        if (!rows.length) {
+          return `
+            <div class="card" id="division-${div.id}">
+              <div class="division-header">
+                <h2>${div.name || "Division"}</h2>
+                <div class="division-tags">
+                  ${tags.map(t => `<span class="pill">${t}</span>`).join(" ")}
+                </div>
+              </div>
+              <p class="note">No athletes or results yet for this division.</p>
+            </div>
+          `;
+        }
+
+        const body = rows.map((r, idx) => `
+          <tr>
+            <td class="rank-cell">${idx + 1}</td>
+            <td>
+              <div class="name-cell">${r.name || ""}</div>
+              <div class="noc-cell">${r.noc || ""}</div>
+            </td>
+            <td>${typeof r.fence === "number" ? r.fence : ""}</td>
+            <td>${typeof r.swim === "number" ? r.swim : ""}</td>
+            <td>${typeof r.obstacle === "number" ? r.obstacle : ""}</td>
+            <td>${typeof r.laser === "number" ? r.laser : ""}</td>
+            <td>${r.total || 0}</td>
+            <td class="handicap-cell">${formatHandicap(r.handicap)}</td>
+          </tr>
+        `).join("");
+
+        return `
+          <div class="card" id="division-${div.id}">
+            <div class="division-header">
+              <h2>${div.name || "Division"}</h2>
+              <div class="division-tags">
+                ${tags.map(t => `<span class="pill">${t}</span>`).join(" ")}
+              </div>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Athlete</th>
+                  <th>Fence</th>
+                  <th>Swim</th>
+                  <th>Obstacle</th>
+                  <th>Laser Run</th>
+                  <th>Total</th>
+                  <th>Handicap<br/><span style="font-size:0.7rem;">m:ss</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                ${body}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }).join("");
+
+      leaderboardContainer.innerHTML = html;
     }
 
     async function loadCompetitions() {
+      setCompetitionMessage("Loading competitions...", "info");
+
       const { data, error } = await supabase
         .from("competitions")
-        .select("*")
+        .select(`
+          id,
+          name,
+          location,
+          start_date,
+          end_date,
+          status,
+          divisions (
+            id,
+            name,
+            age_group,
+            gender,
+            order_index,
+            entries (
+              id,
+              handicap,
+              athletes (
+                first_name,
+                last_name,
+                noc
+              ),
+              results (
+                discipline,
+                points
+              )
+            )
+          )
+        `)
         .in("status", ["live", "finished"])
         .order("start_date", { ascending: false });
 
       if (error) {
-        console.error("Error loading competitions", error);
-        resultsContainer.innerHTML = '<p class="no-results">Failed to load competitions.</p>';
+        console.error(error);
+        setCompetitionMessage("Failed to load competitions.", "error");
+        competitionSelect.innerHTML = '<option value="">Select a competition</option>';
+        leaderboardContainer.innerHTML = "";
         return;
       }
 
-      selectEl.innerHTML = '<option value="">Select a competition</option>';
-      (data || []).forEach(c => {
-        const opt = document.createElement("option");
-        opt.value = c.id;
-        opt.textContent = c.name;
-        selectEl.appendChild(opt);
-      });
+      competitionsCache = data || [];
 
-      if (!data || data.length === 0) {
-        resultsContainer.innerHTML = '<p class="no-results">No live or finished competitions available.</p>';
+      if (!competitionsCache.length) {
+        setCompetitionMessage("No live or finished competitions are currently available.", "info");
+        competitionSelect.innerHTML = '<option value="">Select a competition</option>';
+        leaderboardContainer.innerHTML = "";
+        return;
       }
+
+      setCompetitionMessage("");
+
+      const options = competitionsCache.map(c => `
+        <option value="${c.id}">${c.name}</option>
+      `).join("");
+
+      competitionSelect.innerHTML = `
+        <option value="">Select a competition</option>
+        ${options}
+      `;
     }
 
-    async function loadCompetitionWithDivisionsAndEntries(compId) {
-      if (!compId) {
-        renderResults(null, []);
+    competitionSelect.addEventListener("change", () => {
+      const id = competitionSelect.value;
+      if (!id) {
+        competitionMeta.innerHTML = "";
+        divisionJumpContainer.innerHTML = "";
+        leaderboardContainer.innerHTML = "";
         return;
       }
 
-      const { data: comps, error: compError } = await supabase
-        .from("competitions")
-        .select("*")
-        .eq("id", compId)
-        .limit(1);
+      const comp = competitionsCache.find(c => String(c.id) === String(id));
+      if (!comp) return;
 
-      if (compError || !comps || comps.length === 0) {
-        console.error("Error loading competition", compError);
-        resultsContainer.innerHTML = '<p class="no-results">Failed to load competition.</p>';
-        return;
-      }
+      renderCompetitionLeaderboards(comp);
+    });
 
-      const competition = comps[0];
-
-      const { data: divisions, error: divError } = await supabase
-        .from("divisions")
-        .select(`
-          id,
-          name,
-          age_group,
-          gender,
-          entries (
-            id,
-            created_at,
-            handicap,
-            athletes (
-              first_name,
-              last_name,
-              noc
-            ),
-            results (
-              discipline,
-              raw_value,
-              points
-            )
-          )
-        `)
-        .eq("competition_id", compId)
-        .order("order_index", { ascending: true })
-        .order("name", { ascending: true });
-
-      if (divError) {
-        console.error("Error loading divisions", divError);
-        resultsContainer.innerHTML = '<p class="no-results">Failed to load divisions.</p>';
-        return;
-      }
-
-      const categories = (divisions || []).map(d => ({
-        id: d.id,
-        label: d.name,
-        age_group: d.age_group,
-        gender: d.gender,
-        entries: d.entries || []
-      }));
-
-      renderResults(competition, categories);
+    // global for inline onclick
+    function scrollToDivision(targetId) {
+      const el = document.getElementById(targetId);
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-
-    selectEl.addEventListener("change", () => {
-      const compId = selectEl.value;
-      if (compId) {
-        loadCompetitionWithDivisionsAndEntries(Number(compId));
-      } else {
-        renderResults(null, []);
-      }
-    });
-
-    clearBtn.addEventListener("click", () => {
-      selectEl.value = "";
-      renderResults(null, []);
-    });
+    window.scrollToDivision = scrollToDivision;
 
     (async function init() {
       await loadCompetitions();
@@ -461,4 +604,3 @@
   </script>
 </body>
 </html>
-
