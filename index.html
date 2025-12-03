@@ -179,6 +179,26 @@
       background: #e5e7eb;
     }
 
+    .print-btn {
+      margin-top: 8px;
+      padding: 6px 10px;
+      font-size: 0.85rem;
+      border-radius: 4px;
+      border: none;
+      background: #4f46e5;
+      color: white;
+      cursor: pointer;
+    }
+
+    .print-btn:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    .print-btn:not(:disabled):hover {
+      background: #4338ca;
+    }
+
     .division-header {
       display: flex;
       justify-content: space-between;
@@ -249,6 +269,33 @@
         align-items: flex-start;
       }
     }
+
+    /* Print styles */
+    @media print {
+      header {
+        display: none;
+      }
+      body {
+        background: #ffffff;
+      }
+      main {
+        max-width: none;
+        margin: 0;
+        padding: 0;
+      }
+      .card {
+        box-shadow: none;
+        border-radius: 0;
+        margin: 0 0 8px;
+      }
+      #competition-select,
+      #competition-message,
+      #division-jump-container,
+      .print-btn,
+      .note {
+        display: none !important;
+      }
+    }
   </style>
 </head>
 <body>
@@ -276,6 +323,17 @@
 
       <!-- Division quick-jump buttons -->
       <div id="division-jump-container" class="division-jump-container"></div>
+
+      <!-- Print button -->
+      <button
+        type="button"
+        id="print-btn"
+        class="print-btn"
+        disabled
+        style="display:none;"
+      >
+        Print Results
+      </button>
     </div>
 
     <div id="leaderboard-container"></div>
@@ -294,6 +352,7 @@
     const competitionMeta = document.getElementById("competition-meta");
     const divisionJumpContainer = document.getElementById("division-jump-container");
     const leaderboardContainer = document.getElementById("leaderboard-container");
+    const printBtn = document.getElementById("print-btn");
 
     let competitionsCache = [];
 
@@ -409,6 +468,8 @@
         leaderboardContainer.innerHTML = "";
         divisionJumpContainer.innerHTML = "";
         competitionMeta.innerHTML = "";
+        printBtn.disabled = true;
+        printBtn.style.display = "none";
         return;
       }
 
@@ -439,6 +500,8 @@
             <p class="note">No divisions have been added for this competition yet.</p>
           </div>
         `;
+        printBtn.disabled = true;
+        printBtn.style.display = "none";
         return;
       }
 
@@ -508,6 +571,10 @@
       }).join("");
 
       leaderboardContainer.innerHTML = html;
+
+      // Enable and show print button
+      printBtn.disabled = false;
+      printBtn.style.display = "inline-block";
     }
 
     async function loadCompetitions() {
@@ -560,6 +627,8 @@
         setCompetitionMessage("No live or finished competitions are currently available.", "info");
         competitionSelect.innerHTML = '<option value="">Select a competition</option>';
         leaderboardContainer.innerHTML = "";
+        printBtn.disabled = true;
+        printBtn.style.display = "none";
         return;
       }
 
@@ -581,6 +650,8 @@
         competitionMeta.innerHTML = "";
         divisionJumpContainer.innerHTML = "";
         leaderboardContainer.innerHTML = "";
+        printBtn.disabled = true;
+        printBtn.style.display = "none";
         return;
       }
 
@@ -588,6 +659,11 @@
       if (!comp) return;
 
       renderCompetitionLeaderboards(comp);
+    });
+
+    // Print handler
+    printBtn.addEventListener("click", () => {
+      window.print();
     });
 
     // global for inline onclick
@@ -604,3 +680,4 @@
   </script>
 </body>
 </html>
+
