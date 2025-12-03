@@ -243,6 +243,11 @@
         const totalPoints = pointsList.reduce((sum, p) => (p !== null ? sum + p : sum), 0);
         const hasAnyPoints = pointsList.some(p => p !== null);
 
+        const handicapVal =
+          e.handicap !== null && e.handicap !== undefined && !Number.isNaN(Number(e.handicap))
+            ? Number(e.handicap)
+            : null;
+
         return {
           entryId: e.id,
           name: fullName,
@@ -251,7 +256,8 @@
           swim,
           obstacle,
           laser,
-          totalPoints: hasAnyPoints ? totalPoints : null
+          totalPoints: hasAnyPoints ? totalPoints : null,
+          handicap: handicapVal
         };
       });
 
@@ -269,7 +275,7 @@
       const rowsHtml = rowsData.map((r, idx) => {
         const rank = r.totalPoints !== null ? (idx + 1) : "-";
         const totalCell = r.totalPoints !== null ? r.totalPoints : "-";
-        const handicapCell = "-"; // to be implemented later
+        const handicapCell = r.handicap !== null ? r.handicap : "-";
 
         return `
           <tr>
@@ -401,6 +407,7 @@
           entries (
             id,
             created_at,
+            handicap,
             athletes (
               first_name,
               last_name,
@@ -454,3 +461,4 @@
   </script>
 </body>
 </html>
+
