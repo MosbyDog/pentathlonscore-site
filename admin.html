@@ -360,6 +360,72 @@
               </select>
             </div>
           </div>
+
+          <!-- Scoring settings (optional) -->
+          <div style="margin-top: 8px;">
+            <p class="note">
+              Scoring settings (optional). Used for the <strong>Calc</strong> button in Results to auto-fill points.<br/>
+              Time-based formula: <code>points = base_points + (base_time - actual_time) × points_per_second</code><br/>
+              Fence formula: <code>points = base_points + (victories - base_victories) × points_per_victory</code>
+            </p>
+            <div class="form-row">
+              <div>
+                <label for="div-swim-base-time">Swim base time (sec)</label>
+                <input id="div-swim-base-time" type="number" step="0.01" placeholder="e.g., 150 for 2:30.00" />
+              </div>
+              <div>
+                <label for="div-swim-base-points">Swim base points</label>
+                <input id="div-swim-base-points" type="number" step="1" placeholder="e.g., 250" />
+              </div>
+              <div>
+                <label for="div-swim-pps">Swim points per second</label>
+                <input id="div-swim-pps" type="number" step="0.01" placeholder="e.g., 3" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div>
+                <label for="div-obst-base-time">Obstacle base time (sec)</label>
+                <input id="div-obst-base-time" type="number" step="0.01" placeholder="e.g., 40" />
+              </div>
+              <div>
+                <label for="div-obst-base-points">Obstacle base points</label>
+                <input id="div-obst-base-points" type="number" step="1" placeholder="e.g., 250" />
+              </div>
+              <div>
+                <label for="div-obst-pps">Obstacle points per second</label>
+                <input id="div-obst-pps" type="number" step="0.01" placeholder="e.g., 3" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div>
+                <label for="div-laser-base-time">Laser base time (sec)</label>
+                <input id="div-laser-base-time" type="number" step="0.01" placeholder="e.g., 600 for 10:00" />
+              </div>
+              <div>
+                <label for="div-laser-base-points">Laser base points</label>
+                <input id="div-laser-base-points" type="number" step="1" placeholder="e.g., 500" />
+              </div>
+              <div>
+                <label for="div-laser-pps">Laser points per second</label>
+                <input id="div-laser-pps" type="number" step="0.01" placeholder="e.g., 2" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div>
+                <label for="div-fence-base-v">Fence base victories</label>
+                <input id="div-fence-base-v" type="number" step="0.01" placeholder="e.g., 20" />
+              </div>
+              <div>
+                <label for="div-fence-base-pts">Fence base points</label>
+                <input id="div-fence-base-pts" type="number" step="1" placeholder="e.g., 250" />
+              </div>
+              <div>
+                <label for="div-fence-ppv">Fence points per victory</label>
+                <input id="div-fence-ppv" type="number" step="0.01" placeholder="e.g., 6" />
+              </div>
+            </div>
+          </div>
+
           <button type="submit" class="primary">Add division</button>
           <div id="division-form-message" class="message"></div>
         </form>
@@ -377,6 +443,7 @@
       <h2>Athletes & Results</h2>
       <p class="note">
         Select a competition and division, then add/edit athletes and enter results (raw + points) for each discipline.
+        You can use <strong>Calc</strong> to auto-fill points if scoring settings are set.
       </p>
 
       <label for="athlete-comp-select">Competition</label>
@@ -424,6 +491,7 @@
           <h3 style="margin: 0; font-size: 1rem;">Results for division</h3>
           <p class="note">
             Enter raw performance (e.g., "10V 5D", "2:18.50") and points for each discipline. Enter handicap (if used).
+            Click <strong>Calc</strong> to auto-fill points using the division scoring settings. Then click <strong>Save</strong>.
           </p>
           <div id="results-list-message" class="message"></div>
           <div id="results-container"></div>
@@ -474,6 +542,7 @@
     const resultsContainer = document.getElementById("results-container");
 
     let competitionsCache = [];
+    // divisionsCacheByCompetition: { [competitionId: string]: DivisionRow[] }
     let divisionsCacheByCompetition = {};
     let editingEntryId = null;
     let editingAthleteId = null;
@@ -812,6 +881,9 @@
               <input class="results-input" id="handicap-${e.id}" type="number" step="1" placeholder="e.g., 0" value="${e.handicap ?? ""}" />
             </td>
             <td>
+              <button type="button" class="btn-secondary calc-results-btn" data-entry-id="${e.id}">
+                Calc
+              </button>
               <button type="button" class="btn-secondary save-results-btn" data-entry-id="${e.id}">
                 Save
               </button>
@@ -831,14 +903,172 @@
               <th>Obstacle<br/><span class="small-text">raw & points</span></th>
               <th>Laser Run<br/><span class="small-text">raw & points</span></th>
               <th>Handicap<br/><span class="small-text">e.g., 0, 10</span></th>
-              <th>Save</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
         </table>
       `;
 
-      attachResultsSaveHandlers();
+      attachResultsHandlers();
+    }
+
+    // ---- Scoring helpers ----
+
+    function getCurrentDivisionConfig() {
+      const compId = athleteCompSelect.value;
+      const divisionId = Number(athleteDivSelect.value);
+      if (!compId || !divisionId) return null;
+      const list = divisionsCacheByCompetition[compId] || [];
+      return list.find(d => d.id === divisionId) || null;
+    }
+
+    function parseTimeToSeconds(str) {
+      if (!str) return null;
+      const s = str.trim();
+      if (!s) return null;
+
+      // If it's pure number, treat as seconds
+      if (/^\d+(\.\d+)?$/.test(s)) {
+        return parseFloat(s);
+      }
+
+      // Format like mm:ss.xx or m:ss
+      const parts = s.split(":");
+      if (parts.length === 2) {
+        const mins = parseFloat(parts[0]);
+        const secs = parseFloat(parts[1]);
+        if (isNaN(mins) || isNaN(secs)) return null;
+        return mins * 60 + secs;
+      }
+
+      return null;
+    }
+
+    function calculateTimePoints(actualSeconds, baseSeconds, basePoints, perSecond) {
+      if (
+        actualSeconds == null ||
+        baseSeconds == null ||
+        basePoints == null ||
+        perSecond == null
+      ) return null;
+
+      const pts = basePoints + (baseSeconds - actualSeconds) * perSecond;
+      return Math.round(pts); // round to nearest point
+    }
+
+    function parseFenceRecord(str) {
+      if (!str) return null;
+      const s = str.trim();
+      if (!s) return null;
+
+      // Expect something like "10V 5D" or "10 v 5 d"
+      const regex = /(\d+)\s*[Vv]\b.*?(\d+)\s*[Dd]\b/;
+      const m = s.match(regex);
+      if (m) {
+        const victories = parseFloat(m[1]);
+        const defeats = parseFloat(m[2]);
+        if (isNaN(victories) || isNaN(defeats)) return null;
+        return { victories, defeats };
+      }
+
+      // Fallback: if a single number, treat as victories
+      if (/^\d+(\.\d+)?$/.test(s)) {
+        return { victories: parseFloat(s), defeats: 0 };
+      }
+
+      return null;
+    }
+
+    function calculateFencePoints(record, baseVictories, basePoints, perVictory) {
+      if (
+        !record ||
+        baseVictories == null ||
+        basePoints == null ||
+        perVictory == null
+      ) return null;
+
+      const diff = record.victories - baseVictories;
+      const pts = basePoints + diff * perVictory;
+      return Math.round(pts);
+    }
+
+    async function calcResultsForEntry(entryId) {
+      const id = Number(entryId);
+      if (!id) return;
+
+      const cfg = getCurrentDivisionConfig();
+      if (!cfg) {
+        setResultsListMessage("No scoring settings found for this division. You can still enter points manually.", "error");
+        return;
+      }
+
+      const fenceRawEl = document.getElementById(`fence-raw-${id}`);
+      const fencePtsEl = document.getElementById(`fence-pts-${id}`);
+      const swimRawEl = document.getElementById(`swim-raw-${id}`);
+      const swimPtsEl = document.getElementById(`swim-pts-${id}`);
+      const obstRawEl = document.getElementById(`obstacle-raw-${id}`);
+      const obstPtsEl = document.getElementById(`obstacle-pts-${id}`);
+      const laserRawEl = document.getElementById(`laser-raw-${id}`);
+      const laserPtsEl = document.getElementById(`laser-pts-${id}`);
+
+      // Fence
+      if (fenceRawEl && fencePtsEl) {
+        const rec = parseFenceRecord(fenceRawEl.value);
+        const fencePts = calculateFencePoints(
+          rec,
+          cfg.fence_base_victories,
+          cfg.fence_base_points,
+          cfg.fence_points_per_victory
+        );
+        if (fencePts != null) {
+          fencePtsEl.value = fencePts;
+        }
+      }
+
+      // Swim
+      if (swimRawEl && swimPtsEl) {
+        const sec = parseTimeToSeconds(swimRawEl.value);
+        const swimPts = calculateTimePoints(
+          sec,
+          cfg.swim_base_time_seconds,
+          cfg.swim_base_points,
+          cfg.swim_points_per_second
+        );
+        if (swimPts != null) {
+          swimPtsEl.value = swimPts;
+        }
+      }
+
+      // Obstacle
+      if (obstRawEl && obstPtsEl) {
+        const sec = parseTimeToSeconds(obstRawEl.value);
+        const obstPts = calculateTimePoints(
+          sec,
+          cfg.obstacle_base_time_seconds,
+          cfg.obstacle_base_points,
+          cfg.obstacle_points_per_second
+        );
+        if (obstPts != null) {
+          obstPtsEl.value = obstPts;
+        }
+      }
+
+      // Laser
+      if (laserRawEl && laserPtsEl) {
+        const sec = parseTimeToSeconds(laserRawEl.value);
+        const laserPts = calculateTimePoints(
+          sec,
+          cfg.laser_base_time_seconds,
+          cfg.laser_base_points,
+          cfg.laser_points_per_second
+        );
+        if (laserPts != null) {
+          laserPtsEl.value = laserPts;
+        }
+      }
+
+      setResultsListMessage("Points calculated (not yet saved). Click Save to store.", "success");
     }
 
     async function saveResultsForEntry(entryId) {
@@ -923,13 +1153,22 @@
       setResultsListMessage("Results saved.", "success");
     }
 
-    function attachResultsSaveHandlers() {
-      const buttons = resultsContainer.querySelectorAll(".save-results-btn");
-      buttons.forEach(btn => {
+    function attachResultsHandlers() {
+      const saveButtons = resultsContainer.querySelectorAll(".save-results-btn");
+      saveButtons.forEach(btn => {
         btn.addEventListener("click", async () => {
           const entryId = btn.dataset.entryId;
           if (!entryId) return;
           await saveResultsForEntry(entryId);
+        });
+      });
+
+      const calcButtons = resultsContainer.querySelectorAll(".calc-results-btn");
+      calcButtons.forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const entryId = btn.dataset.entryId;
+          if (!entryId) return;
+          await calcResultsForEntry(entryId);
         });
       });
     }
@@ -1134,18 +1373,48 @@
       const ageGroup = document.getElementById("div-age-group").value.trim();
       const gender = document.getElementById("div-gender").value;
 
+      const swimBaseTime = document.getElementById("div-swim-base-time").value.trim();
+      const swimBasePts = document.getElementById("div-swim-base-points").value.trim();
+      const swimPps = document.getElementById("div-swim-pps").value.trim();
+
+      const obstBaseTime = document.getElementById("div-obst-base-time").value.trim();
+      const obstBasePts = document.getElementById("div-obst-base-points").value.trim();
+      const obstPps = document.getElementById("div-obst-pps").value.trim();
+
+      const laserBaseTime = document.getElementById("div-laser-base-time").value.trim();
+      const laserBasePts = document.getElementById("div-laser-base-points").value.trim();
+      const laserPps = document.getElementById("div-laser-pps").value.trim();
+
+      const fenceBaseV = document.getElementById("div-fence-base-v").value.trim();
+      const fenceBasePts = document.getElementById("div-fence-base-pts").value.trim();
+      const fencePpv = document.getElementById("div-fence-ppv").value.trim();
+
       if (!name) {
         setDivisionFormMessage("Division name is required.", "error");
         return;
       }
 
-      const { error } = await supabase.from("divisions").insert({
+      const insertObj = {
         competition_id: Number(competitionId),
         name,
         age_group: ageGroup || null,
         gender: gender || null,
-        order_index: 0
-      });
+        order_index: 0,
+        swim_base_time_seconds: swimBaseTime ? Number(swimBaseTime) : null,
+        swim_base_points: swimBasePts ? Number(swimBasePts) : null,
+        swim_points_per_second: swimPps ? Number(swimPps) : null,
+        obstacle_base_time_seconds: obstBaseTime ? Number(obstBaseTime) : null,
+        obstacle_base_points: obstBasePts ? Number(obstBasePts) : null,
+        obstacle_points_per_second: obstPps ? Number(obstPps) : null,
+        laser_base_time_seconds: laserBaseTime ? Number(laserBaseTime) : null,
+        laser_base_points: laserBasePts ? Number(laserBasePts) : null,
+        laser_points_per_second: laserPps ? Number(laserPps) : null,
+        fence_base_victories: fenceBaseV ? Number(fenceBaseV) : null,
+        fence_base_points: fenceBasePts ? Number(fenceBasePts) : null,
+        fence_points_per_victory: fencePpv ? Number(fencePpv) : null
+      };
+
+      const { error } = await supabase.from("divisions").insert(insertObj);
 
       if (error) {
         console.error(error);
@@ -1278,4 +1547,3 @@
   </script>
 </body>
 </html>
-
