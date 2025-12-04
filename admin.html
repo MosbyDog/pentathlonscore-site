@@ -428,13 +428,15 @@
             </div>
           </div>
 
-          <button type="submit" class="primary">Add division</button>
+          <button type="submit" class="primary" id="division-submit-btn">Add division</button>
+          <button type="button" class="btn-secondary" id="division-cancel-edit-btn" style="display:none;">Cancel edit</button>
+          <span class="small-text" id="division-mode-label"></span>
           <div id="division-form-message" class="message"></div>
         </form>
 
         <div style="margin-top: 12px;">
           <h3 style="margin: 0; font-size: 1rem;">Divisions</h3>
-          <p class="note">Use Move Up / Move Down to reorder divisions for this competition.</p>
+          <p class="note">Use Edit to change scoring; Move Up / Move Down to reorder for this competition.</p>
           <div id="division-list-message" class="message"></div>
           <div id="divisions-container"></div>
         </div>
@@ -530,6 +532,9 @@
     const divisionFormMsg = document.getElementById("division-form-message");
     const divisionListMsg = document.getElementById("division-list-message");
     const divisionsContainer = document.getElementById("divisions-container");
+    const divisionSubmitBtn = document.getElementById("division-submit-btn");
+    const divisionCancelEditBtn = document.getElementById("division-cancel-edit-btn");
+    const divisionModeLabel = document.getElementById("division-mode-label");
 
     const athleteCompSelect = document.getElementById("athlete-comp-select");
     const athleteDivSelect = document.getElementById("athlete-div-select");
@@ -549,6 +554,7 @@
     let divisionsCacheByCompetition = {};
     let editingEntryId = null;
     let editingAthleteId = null;
+    let editingDivisionId = null;
 
     function setFormMessage(text, type = "info") {
       formMsg.textContent = text || "";
@@ -626,6 +632,49 @@
 
     athleteCancelEditBtn.addEventListener("click", () => {
       enterAddMode();
+    });
+
+    function enterDivisionAddMode() {
+      editingDivisionId = null;
+      divisionForm.reset();
+      document.getElementById("div-gender").value = "M";
+      setDivisionFormMessage("");
+      divisionSubmitBtn.textContent = "Add division";
+      divisionCancelEditBtn.style.display = "none";
+      divisionModeLabel.textContent = "";
+    }
+
+    function enterDivisionEditMode(division) {
+      editingDivisionId = division.id;
+
+      document.getElementById("div-name").value = division.name || "";
+      document.getElementById("div-age-group").value = division.age_group || "";
+      document.getElementById("div-gender").value = division.gender || "M";
+
+      document.getElementById("div-swim-base-time").value = division.swim_base_time_seconds ?? "";
+      document.getElementById("div-swim-base-points").value = division.swim_base_points ?? "";
+      document.getElementById("div-swim-pps").value = division.swim_points_per_second ?? "";
+
+      document.getElementById("div-obst-base-time").value = division.obstacle_base_time_seconds ?? "";
+      document.getElementById("div-obst-base-points").value = division.obstacle_base_points ?? "";
+      document.getElementById("div-obst-pps").value = division.obstacle_points_per_second ?? "";
+
+      document.getElementById("div-laser-base-time").value = division.laser_base_time_seconds ?? "";
+      document.getElementById("div-laser-base-points").value = division.laser_base_points ?? "";
+      document.getElementById("div-laser-pps").value = division.laser_points_per_second ?? "";
+
+      document.getElementById("div-fence-base-v").value = division.fence_base_victories ?? "";
+      document.getElementById("div-fence-base-pts").value = division.fence_base_points ?? "";
+      document.getElementById("div-fence-ppv").value = division.fence_points_per_victory ?? "";
+
+      divisionSubmitBtn.textContent = "Save division changes";
+      divisionCancelEditBtn.style.display = "inline-block";
+      divisionModeLabel.textContent = "Editing existing division settings";
+      setDivisionFormMessage("");
+    }
+
+    divisionCancelEditBtn.addEventListener("click", () => {
+      enterDivisionAddMode();
     });
 
     function formatStatusTag(status) {
@@ -716,6 +765,13 @@
           <td>
             <button
               type="button"
+              class="btn-secondary edit-division-btn"
+              data-division-id="${d.id}"
+            >
+              Edit
+            </button>
+            <button
+              type="button"
               class="btn-secondary move-division-btn"
               data-division-id="${d.id}"
               data-direction="up"
@@ -757,6 +813,7 @@
         </table>
       `;
 
+      attachDivisionEditHandlers();
       attachDivisionOrderHandlers();
       attachDivisionDeleteHandlers();
     }
@@ -989,12 +1046,10 @@
       const s = str.trim();
       if (!s) return null;
 
-      // If it's pure number, treat as seconds
       if (/^\d+(\.\d+)?$/.test(s)) {
         return parseFloat(s);
       }
 
-      // Format like mm:ss.xx or m:ss
       const parts = s.split(":");
       if (parts.length === 2) {
         const mins = parseFloat(parts[0]);
@@ -1006,7 +1061,6 @@
       return null;
     }
 
-    // Use floor of diff to match UIPM-style brackets
     function calculateTimePoints(actualSeconds, baseSeconds, basePoints, perSecond) {
       if (
         actualSeconds == null ||
@@ -1025,7 +1079,6 @@
       const s = str.trim();
       if (!s) return null;
 
-      // Expect something like "10V 5D" or "10 v 5 d"
       const regex = /(\d+)\s*[Vv]\b.*?(\d+)\s*[Dd]\b/;
       const m = s.match(regex);
       if (m) {
@@ -1035,7 +1088,6 @@
         return { victories, defeats };
       }
 
-      // Fallback: if a single number, treat as victories
       if (/^\d+(\.\d+)?$/.test(s)) {
         return { victories: parseFloat(s), defeats: 0 };
       }
@@ -1074,7 +1126,6 @@
       const laserRawEl = document.getElementById(`laser-raw-${id}`);
       const laserPtsEl = document.getElementById(`laser-pts-${id}`);
 
-      // Fence
       if (fenceRawEl && fencePtsEl) {
         const rec = parseFenceRecord(fenceRawEl.value);
         const fencePts = calculateFencePoints(
@@ -1088,7 +1139,6 @@
         }
       }
 
-      // Swim
       if (swimRawEl && swimPtsEl) {
         const sec = parseTimeToSeconds(swimRawEl.value);
         const swimPts = calculateTimePoints(
@@ -1102,7 +1152,6 @@
         }
       }
 
-      // Obstacle
       if (obstRawEl && obstPtsEl) {
         const sec = parseTimeToSeconds(obstRawEl.value);
         const obstPts = calculateTimePoints(
@@ -1116,7 +1165,6 @@
         }
       }
 
-      // Laser
       if (laserRawEl && laserPtsEl) {
         const sec = parseTimeToSeconds(laserRawEl.value);
         const laserPts = calculateTimePoints(
@@ -1136,7 +1184,6 @@
     async function recalcHandicapsForDivision(divisionId) {
       if (!divisionId) return;
 
-      // Get all entries + results for this division
       const { data: allEntries, error } = await supabase
         .from("entries")
         .select(`
@@ -1155,7 +1202,6 @@
         return;
       }
 
-      // Compute total points for each entry
       const totals = allEntries.map(e => {
         const resArr = e.results || [];
         const total = resArr.reduce((sum, r) => {
@@ -1166,9 +1212,8 @@
 
       const maxTotal = totals.reduce((max, t) => Math.max(max, t.total), 0);
 
-      // Update handicap = maxTotal - total (1 point = 1 second)
       for (const t of totals) {
-        const handicap = maxTotal - t.total; // leader => 0, others positive
+        const handicap = maxTotal - t.total;
         const { error: updErr } = await supabase
           .from("entries")
           .update({ handicap })
@@ -1182,8 +1227,6 @@
       }
 
       setResultsListMessage("Results saved. Handicaps recalculated for this division.", "success");
-
-      // Reload athletes/results to show fresh handicaps
       await loadAthletesForDivision(divisionId);
     }
 
@@ -1218,7 +1261,6 @@
 
       setResultsListMessage("Saving results...");
 
-      // Delete empty disciplines
       for (const disc of deletes) {
         const { error } = await supabase
           .from("results")
@@ -1232,7 +1274,6 @@
         }
       }
 
-      // Upsert non-empty disciplines
       if (upserts.length > 0) {
         const { error } = await supabase
           .from("results")
@@ -1244,7 +1285,6 @@
         }
       }
 
-      // Now recalc handicaps for entire division based on total points
       await recalcHandicapsForDivision(divIdNum);
     }
 
@@ -1383,7 +1423,6 @@
       renderResultsEditor(data);
     }
 
-    // ---- Division delete ----
     function attachDivisionDeleteHandlers() {
       const buttons = divisionsContainer.querySelectorAll(".delete-division-btn");
       buttons.forEach(btn => {
@@ -1401,7 +1440,6 @@
 
           setDivisionListMessage("Deleting division and related data...");
 
-          // 1) Load entries in this division
           const { data: entries, error: entriesError } = await supabase
             .from("entries")
             .select("id")
@@ -1415,7 +1453,6 @@
 
           const entryIds = (entries || []).map(e => e.id);
 
-          // 2) Delete results for those entries (if any)
           if (entryIds.length > 0) {
             const { error: resultsError } = await supabase
               .from("results")
@@ -1429,7 +1466,6 @@
             }
           }
 
-          // 3) Delete entries for this division
           const { error: delEntriesError } = await supabase
             .from("entries")
             .delete()
@@ -1441,7 +1477,6 @@
             return;
           }
 
-          // 4) Delete the division itself
           const { error: divError } = await supabase
             .from("divisions")
             .delete()
@@ -1455,11 +1490,9 @@
 
           setDivisionListMessage("Division deleted.", "success");
 
-          // Reload divisions for this competition and update caches + dropdown
           const divisions = await loadDivisionsForCompetition(compId);
           populateAthleteDivisionSelect(sortedDivisionsForCompId(compId));
 
-          // If the deleted division was currently selected in the Athletes section, clear it
           if (Number(athleteDivSelect.value) === divisionId) {
             athleteDivSelect.value = "";
             athleteSection.style.display = "none";
@@ -1472,7 +1505,6 @@
       });
     }
 
-    // ---- Division reordering ----
     function attachDivisionOrderHandlers() {
       const buttons = divisionsContainer.querySelectorAll(".move-division-btn");
       buttons.forEach(btn => {
@@ -1489,9 +1521,8 @@
           let newIndex = idx;
           if (direction === "up" && idx > 0) newIndex = idx - 1;
           if (direction === "down" && idx < currentList.length - 1) newIndex = idx + 1;
-          if (newIndex === idx) return; // nothing to do
+          if (newIndex === idx) return;
 
-          // Make a copy and swap in that copy
           const swapped = currentList.slice();
           const temp = swapped[idx];
           swapped[idx] = swapped[newIndex];
@@ -1499,7 +1530,6 @@
 
           setDivisionListMessage("Updating division order...");
 
-          // Update order_index for each division one-by-one
           for (let i = 0; i < swapped.length; i++) {
             const d = swapped[i];
             const { error } = await supabase
@@ -1517,7 +1547,6 @@
             }
           }
 
-          // refresh cache, UI, and athlete division dropdown
           const divisions = await loadDivisionsForCompetition(compId);
           populateAthleteDivisionSelect(sortedDivisionsForCompId(compId));
           setDivisionListMessage("Division order updated.", "success");
@@ -1525,7 +1554,22 @@
       });
     }
 
-    // Event handlers
+    function attachDivisionEditHandlers() {
+      const buttons = divisionsContainer.querySelectorAll(".edit-division-btn");
+      buttons.forEach(btn => {
+        btn.addEventListener("click", () => {
+          const divisionId = Number(btn.dataset.divisionId);
+          const compId = divisionCompSelect.value;
+          if (!divisionId || !compId) return;
+
+          const list = divisionsCacheByCompetition[compId] || [];
+          const division = list.find(d => d.id === divisionId);
+          if (!division) return;
+
+          enterDivisionEditMode(division);
+        });
+      });
+    }
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -1588,19 +1632,19 @@
 
     divisionCompSelect.addEventListener("change", async () => {
       const compId = divisionCompSelect.value;
+      divisionSection.style.display = compId ? "block" : "none";
+      enterDivisionAddMode();
       if (!compId) {
-        divisionSection.style.display = "none";
         setDivisionListMessage("Select a competition to view divisions.");
         divisionsContainer.innerHTML = "";
         return;
       }
-      divisionSection.style.display = "block";
       await loadDivisionsForCompetition(compId);
     });
 
     divisionForm.addEventListener("submit", async (e) => {
       e.preventDefault();
-      setDivisionFormMessage("Adding division...");
+      setDivisionFormMessage(editingDivisionId ? "Saving division changes..." : "Adding division...");
 
       const competitionId = divisionCompSelect.value;
       if (!competitionId) {
@@ -1633,12 +1677,10 @@
         return;
       }
 
-      const insertObj = {
-        competition_id: Number(competitionId),
+      const baseFields = {
         name,
         age_group: ageGroup || null,
         gender: gender || null,
-        order_index: 0,
         swim_base_time_seconds: swimBaseTime ? Number(swimBaseTime) : null,
         swim_base_points: swimBasePts ? Number(swimBasePts) : null,
         swim_points_per_second: swimPps ? Number(swimPps) : null,
@@ -1653,17 +1695,40 @@
         fence_points_per_victory: fencePpv ? Number(fencePpv) : null
       };
 
-      const { error } = await supabase.from("divisions").insert(insertObj);
+      if (editingDivisionId) {
+        const { error } = await supabase
+          .from("divisions")
+          .update(baseFields)
+          .eq("id", editingDivisionId);
 
-      if (error) {
-        console.error(error);
-        setDivisionFormMessage("Failed to add division: " + (error.message || ""), "error");
-        return;
+        if (error) {
+          console.error(error);
+          setDivisionFormMessage("Failed to save division changes: " + (error.message || ""), "error");
+          return;
+        }
+
+        setDivisionFormMessage("Division updated.", "success");
+        enterDivisionAddMode();
+      } else {
+        const insertObj = {
+          competition_id: Number(competitionId),
+          order_index: 0,
+          ...baseFields
+        };
+
+        const { error } = await supabase.from("divisions").insert(insertObj);
+
+        if (error) {
+          console.error(error);
+          setDivisionFormMessage("Failed to add division: " + (error.message || ""), "error");
+          return;
+        }
+
+        setDivisionFormMessage("Division added.", "success");
+        divisionForm.reset();
+        document.getElementById("div-gender").value = "M";
       }
 
-      setDivisionFormMessage("Division added.", "success");
-      divisionForm.reset();
-      document.getElementById("div-gender").value = "M";
       const divisions = await loadDivisionsForCompetition(competitionId);
       populateAthleteDivisionSelect(sortedDivisionsForCompId(competitionId));
     });
@@ -1715,7 +1780,6 @@
         return;
       }
 
-      // EDIT MODE
       if (editingEntryId && editingAthleteId) {
         setAthleteFormMessage("Saving athlete changes...");
 
@@ -1737,7 +1801,6 @@
         return;
       }
 
-      // ADD MODE
       setAthleteFormMessage("Adding athlete...");
 
       const { data: newAthlete, error: athleteError } = await supabase
@@ -1778,6 +1841,7 @@
     (async function init() {
       await requireAuth();
       await loadCompetitions();
+      enterDivisionAddMode();
       setDivisionListMessage("Select a competition to view divisions.");
       setAthleteListMessage("Select competition and division to view athletes.");
       setResultsListMessage("");
@@ -1786,4 +1850,3 @@
   </script>
 </body>
 </html>
-
