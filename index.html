@@ -234,6 +234,11 @@
 
     th:first-child,
     td:first-child {
+      text-align: center;
+    }
+
+    th:nth-child(2),
+    td:nth-child(2) {
       text-align: left;
     }
 
@@ -244,15 +249,25 @@
     .rank-cell {
       text-align: center;
       font-weight: 600;
+      width: 60px;
     }
 
     .name-cell {
       font-weight: 500;
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .noc-cell {
       font-size: 0.8rem;
       color: #6b7280;
+    }
+
+    .disc-cell {
+      font-size: 0.8rem;
+      font-variant-numeric: tabular-nums;
     }
 
     .handicap-cell {
@@ -267,6 +282,9 @@
       .division-header {
         flex-direction: column;
         align-items: flex-start;
+      }
+      .name-cell {
+        max-width: 150px;
       }
     }
 
@@ -388,21 +406,42 @@
       return sign + m + ":" + sStr;
     }
 
+    function formatDisciplineCell(discObj) {
+      if (!discObj) return "";
+      const raw = (discObj.raw || "").trim();
+      const pts = (typeof discObj.pts === "number") ? discObj.pts : null;
+
+      if (raw && pts != null) return `${raw} (${pts})`;
+      if (raw) return raw;
+      if (pts != null) return String(pts);
+      return "";
+    }
+
     function buildDivisionRows(division) {
       const entries = division.entries || [];
       const rows = entries.map(e => {
         const a = e.athletes || e.athlete || {};
         const resArr = e.results || [];
 
-        const ptsByDisc = { fence: null, swim: null, obstacle: null, laser: null };
+        const byDisc = {
+          fence: { raw: null, pts: null },
+          swim: { raw: null, pts: null },
+          obstacle: { raw: null, pts: null },
+          laser: { raw: null, pts: null }
+        };
+
         resArr.forEach(r => {
-          if (r && r.discipline && ptsByDisc.hasOwnProperty(r.discipline)) {
-            ptsByDisc[r.discipline] = r.points;
-          }
+          if (!r || !r.discipline) return;
+          const key = r.discipline;
+          if (!byDisc[key]) return;
+          byDisc[key] = {
+            raw: r.raw_value || null,
+            pts: typeof r.points === "number" ? r.points : (r.points == null ? null : Number(r.points))
+          };
         });
 
         const total = ["fence", "swim", "obstacle", "laser"].reduce((sum, d) => {
-          const val = ptsByDisc[d];
+          const val = byDisc[d].pts;
           return sum + (typeof val === "number" ? val : 0);
         }, 0);
 
@@ -414,10 +453,10 @@
           entryId: e.id,
           name,
           noc: a.noc || "",
-          fence: ptsByDisc.fence,
-          swim: ptsByDisc.swim,
-          obstacle: ptsByDisc.obstacle,
-          laser: ptsByDisc.laser,
+          fence: byDisc.fence,
+          swim: byDisc.swim,
+          obstacle: byDisc.obstacle,
+          laser: byDisc.laser,
           total,
           handicap: e.handicap
         };
@@ -532,10 +571,10 @@
               <div class="name-cell">${r.name || ""}</div>
               <div class="noc-cell">${r.noc || ""}</div>
             </td>
-            <td>${typeof r.fence === "number" ? r.fence : ""}</td>
-            <td>${typeof r.swim === "number" ? r.swim : ""}</td>
-            <td>${typeof r.obstacle === "number" ? r.obstacle : ""}</td>
-            <td>${typeof r.laser === "number" ? r.laser : ""}</td>
+            <td class="disc-cell">${formatDisciplineCell(r.fence)}</td>
+            <td class="disc-cell">${formatDisciplineCell(r.swim)}</td>
+            <td class="disc-cell">${formatDisciplineCell(r.obstacle)}</td>
+            <td class="disc-cell">${formatDisciplineCell(r.laser)}</td>
             <td>${r.total || 0}</td>
             <td class="handicap-cell">${formatHandicap(r.handicap)}</td>
           </tr>
@@ -552,7 +591,7 @@
             <table>
               <thead>
                 <tr>
-                  <th>#</th>
+                  <th>Place</th>
                   <th>Athlete</th>
                   <th>Fence</th>
                   <th>Swim</th>
@@ -605,6 +644,7 @@
               ),
               results (
                 discipline,
+                raw_value,
                 points
               )
             )
@@ -680,4 +720,3 @@
   </script>
 </body>
 </html>
-
