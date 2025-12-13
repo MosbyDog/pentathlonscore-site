@@ -564,21 +564,38 @@
           `;
         }
 
-        const body = rows.map((r, idx) => `
-          <tr>
-            <td class="rank-cell">${idx + 1}</td>
-            <td>
-              <div class="name-cell">${r.name || ""}</div>
-              <div class="noc-cell">${r.noc || ""}</div>
-            </td>
-            <td class="disc-cell">${formatDisciplineCell(r.fence)}</td>
-            <td class="disc-cell">${formatDisciplineCell(r.swim)}</td>
-            <td class="disc-cell">${formatDisciplineCell(r.obstacle)}</td>
-            <td class="disc-cell">${formatDisciplineCell(r.laser)}</td>
-            <td>${r.total || 0}</td>
-            <td class="handicap-cell">${formatHandicap(r.handicap)}</td>
-          </tr>
-        `).join("");
+        // Compute "Place" with ties:
+        // e.g., scores [1000,1000,1000,950] => places [1,1,1,4]
+        let lastPoints = null;
+        let lastPlace = 0;
+        const body = rows.map((r, idx) => {
+          let place;
+          if (idx === 0) {
+            place = 1;
+          } else if (r.total === lastPoints) {
+            place = lastPlace;
+          } else {
+            place = idx + 1;
+          }
+          lastPoints = r.total;
+          lastPlace = place;
+
+          return `
+            <tr>
+              <td class="rank-cell">${place}</td>
+              <td>
+                <div class="name-cell">${r.name || ""}</div>
+                <div class="noc-cell">${r.noc || ""}</div>
+              </td>
+              <td class="disc-cell">${formatDisciplineCell(r.fence)}</td>
+              <td class="disc-cell">${formatDisciplineCell(r.swim)}</td>
+              <td class="disc-cell">${formatDisciplineCell(r.obstacle)}</td>
+              <td class="disc-cell">${formatDisciplineCell(r.laser)}</td>
+              <td>${r.total || 0}</td>
+              <td class="handicap-cell">${formatHandicap(r.handicap)}</td>
+            </tr>
+          `;
+        }).join("");
 
         return `
           <div class="card" id="division-${div.id}">
@@ -720,3 +737,4 @@
   </script>
 </body>
 </html>
+
