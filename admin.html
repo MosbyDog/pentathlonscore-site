@@ -234,6 +234,16 @@
     .results-table th, .results-table td {
       text-align: center;
     }
+
+    .disabled-note {
+      font-size: 0.75rem;
+      color: #6b7280;
+      line-height: 1.2;
+    }
+
+    .nowrap {
+      white-space: nowrap;
+    }
   </style>
 </head>
 <body>
@@ -400,15 +410,15 @@
             </div>
             <div class="form-row">
               <div>
-                <label for="div-laser-base-time">Laser base time (sec)</label>
+                <label for="div-laser-base-time">Laser Run base time (sec)</label>
                 <input id="div-laser-base-time" type="number" step="0.01" placeholder="e.g., 600 for 10:00" />
               </div>
               <div>
-                <label for="div-laser-base-points">Laser base points</label>
+                <label for="div-laser-base-points">Laser Run base points</label>
                 <input id="div-laser-base-points" type="number" step="1" value="500" placeholder="e.g., 500" />
               </div>
               <div>
-                <label for="div-laser-pps">Laser points per second</label>
+                <label for="div-laser-pps">Laser Run points per second</label>
                 <input id="div-laser-pps" type="number" step="0.01" value="1" placeholder="e.g., 1" />
               </div>
             </div>
@@ -449,6 +459,7 @@
       <p class="note">
         Select a competition and division, then add/edit athletes and enter results (raw & points) for each discipline.
         Handicaps auto-calculate from total points (leader = 0).
+        <br><strong>Tie-break:</strong> appears only after <strong>all Laser Run points</strong> are entered for the division.
       </p>
 
       <label for="athlete-comp-select">Competition</label>
@@ -763,37 +774,10 @@
           <td>${d.order_index ?? ""}</td>
           <td>${d.created_at ? d.created_at.slice(0, 10) : ""}</td>
           <td>
-            <button
-              type="button"
-              class="btn-secondary edit-division-btn"
-              data-division-id="${d.id}"
-            >
-              Edit
-            </button>
-            <button
-              type="button"
-              class="btn-secondary move-division-btn"
-              data-division-id="${d.id}"
-              data-direction="up"
-            >
-              ↑
-            </button>
-            <button
-              type="button"
-              class="btn-secondary move-division-btn"
-              data-division-id="${d.id}"
-              data-direction="down"
-            >
-              ↓
-            </button>
-            <button
-              type="button"
-              class="btn-danger delete-division-btn"
-              data-division-id="${d.id}"
-              data-division-name="${d.name || ""}"
-            >
-              Delete
-            </button>
+            <button type="button" class="btn-secondary edit-division-btn" data-division-id="${d.id}">Edit</button>
+            <button type="button" class="btn-secondary move-division-btn" data-division-id="${d.id}" data-direction="up">↑</button>
+            <button type="button" class="btn-secondary move-division-btn" data-division-id="${d.id}" data-direction="down">↓</button>
+            <button type="button" class="btn-danger delete-division-btn" data-division-id="${d.id}" data-division-name="${d.name || ""}">Delete</button>
           </td>
         </tr>
       `).join("");
@@ -840,10 +824,7 @@
           if (!ok) return;
 
           setAthleteListMessage("Removing athlete from division...");
-          const { error } = await supabase
-            .from("entries")
-            .delete()
-            .eq("id", entryId);
+          const { error } = await supabase.from("entries").delete().eq("id", entryId);
 
           if (error) {
             console.error(error);
@@ -870,13 +851,7 @@
           const lastName = btn.dataset.lastName || "";
           const noc = btn.dataset.noc || "";
 
-          enterEditMode({
-            entryId,
-            athleteId,
-            firstName,
-            lastName,
-            noc
-          });
+          enterEditMode({ entryId, athleteId, firstName, lastName, noc });
         });
       });
     }
@@ -896,24 +871,14 @@
             <td>${a.noc || ""}</td>
             <td>${e.created_at ? e.created_at.slice(0, 10) : ""}</td>
             <td>
-              <button
-                type="button"
-                class="btn-secondary edit-entry-btn"
+              <button type="button" class="btn-secondary edit-entry-btn"
                 data-entry-id="${e.id}"
                 data-athlete-id="${e.athlete_id}"
                 data-first-name="${a.first_name || ""}"
                 data-last-name="${a.last_name || ""}"
                 data-noc="${a.noc || ""}"
-              >
-                Edit
-              </button>
-              <button
-                type="button"
-                class="btn-danger delete-entry-btn"
-                data-entry-id="${e.id}"
-              >
-                Remove
-              </button>
+              >Edit</button>
+              <button type="button" class="btn-danger delete-entry-btn" data-entry-id="${e.id}">Remove</button>
             </td>
           </tr>
         `;
@@ -942,11 +907,59 @@
       return resultsArr.find(r => r.discipline === discipline) || null;
     }
 
+    // Tie-break should only show after ALL Laser Run points exist in this division
+    function divisionLaserComplete(entries) {
+      if (!entries || entries.length === 0) return false;
+      return entries.every(e => {
+        const res = e.results || [];
+        const laser = res.find(r => r.discipline === "laser");
+        return laser && laser.points !== null && laser.points !== undefined && laser.points !== "";
+      });
+    }
+
+    async function saveTieBreakForEntry(entryId, value) {
+      const id = Number(entryId);
+      if (!id) return;
+
+      const raw = (value || "").toString().trim();
+      const tie_break_order = raw === "" ? null : Number(raw);
+
+      setResultsListMessage("Saving tie-break...");
+      const { error } = await supabase
+        .from("entries")
+        .update({ tie_break_order })
+        .eq("id", id);
+
+      if (error) {
+        console.error(error);
+        setResultsListMessage("Failed to save tie-break: " + (error.message || ""), "error");
+        return;
+      }
+
+      setResultsListMessage("Tie-break saved.", "success");
+      await loadAthletesForDivision(Number(athleteDivSelect.value));
+    }
+
+    function attachTieBreakHandlers(laserComplete) {
+      const buttons = resultsContainer.querySelectorAll(".save-tiebreak-btn");
+      buttons.forEach(btn => {
+        btn.addEventListener("click", async () => {
+          if (!laserComplete) return;
+          const entryId = btn.dataset.entryId;
+          const input = document.getElementById(`tiebreak-${entryId}`);
+          if (!entryId || !input) return;
+          await saveTieBreakForEntry(entryId, input.value);
+        });
+      });
+    }
+
     function renderResultsEditor(entries) {
       if (!entries || entries.length === 0) {
         resultsContainer.innerHTML = '<p class="note">No athletes in this division yet.</p>';
         return;
       }
+
+      const laserComplete = divisionLaserComplete(entries);
 
       const rows = entries.map(e => {
         const a = e.athletes || e.athlete || {};
@@ -956,6 +969,14 @@
         const swim = getDisciplineResult(resArr, "swim");
         const obstacle = getDisciplineResult(resArr, "obstacle");
         const laser = getDisciplineResult(resArr, "laser");
+
+        const tieBreakCell = laserComplete
+          ? `
+            <input class="results-input" id="tiebreak-${e.id}" type="number" step="1" placeholder="e.g., 1"
+              value="${e.tie_break_order ?? ""}" />
+            <button type="button" class="btn-secondary save-tiebreak-btn" data-entry-id="${e.id}">Save</button>
+          `
+          : `<div class="disabled-note">Tie-break unlocks after all Laser Run points are entered for this division.</div>`;
 
         return `
           <tr>
@@ -978,33 +999,13 @@
               <input class="results-input" id="laser-pts-${e.id}" type="number" step="1" placeholder="points" value="${laser?.points ?? ""}" />
             </td>
             <td>
-              <input
-                class="results-input"
-                id="handicap-${e.id}"
-                type="number"
-                step="1"
-                placeholder="auto"
-                value="${e.handicap ?? ""}"
-                readonly
-              />
+              <input class="results-input" id="handicap-${e.id}" type="number" step="1" placeholder="auto"
+                value="${e.handicap ?? ""}" readonly />
             </td>
-            <td>
-              <button
-                type="button"
-                class="btn-secondary calc-results-btn"
-                data-entry-id="${e.id}"
-                data-division-id="${e.division_id}"
-              >
-                Calc
-              </button>
-              <button
-                type="button"
-                class="btn-secondary save-results-btn"
-                data-entry-id="${e.id}"
-                data-division-id="${e.division_id}"
-              >
-                Save
-              </button>
+            <td>${tieBreakCell}</td>
+            <td class="nowrap">
+              <button type="button" class="btn-secondary calc-results-btn" data-entry-id="${e.id}" data-division-id="${e.division_id}">Calc</button>
+              <button type="button" class="btn-secondary save-results-btn" data-entry-id="${e.id}" data-division-id="${e.division_id}">Save</button>
             </td>
           </tr>
         `;
@@ -1021,6 +1022,7 @@
               <th>Obstacle<br/><span class="small-text">raw & points</span></th>
               <th>Laser Run<br/><span class="small-text">raw & points</span></th>
               <th>Handicap<br/><span class="small-text">auto (sec)</span></th>
+              <th>Tie-break<br/><span class="small-text">post Laser Run</span></th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -1029,6 +1031,7 @@
       `;
 
       attachResultsHandlers();
+      attachTieBreakHandlers(laserComplete);
     }
 
     // ---- Scoring helpers ----
@@ -1062,13 +1065,7 @@
     }
 
     function calculateTimePoints(actualSeconds, baseSeconds, basePoints, perSecond) {
-      if (
-        actualSeconds == null ||
-        baseSeconds == null ||
-        basePoints == null ||
-        perSecond == null
-      ) return null;
-
+      if (actualSeconds == null || baseSeconds == null || basePoints == null || perSecond == null) return null;
       const diff = (baseSeconds - actualSeconds) * perSecond;
       const pts = basePoints + Math.floor(diff);
       return pts;
@@ -1096,13 +1093,7 @@
     }
 
     function calculateFencePoints(record, baseVictories, basePoints, perVictory) {
-      if (
-        !record ||
-        baseVictories == null ||
-        basePoints == null ||
-        perVictory == null
-      ) return null;
-
+      if (!record || baseVictories == null || basePoints == null || perVictory == null) return null;
       const diff = record.victories - baseVictories;
       return basePoints + Math.floor(diff) * perVictory;
     }
@@ -1128,54 +1119,26 @@
 
       if (fenceRawEl && fencePtsEl) {
         const rec = parseFenceRecord(fenceRawEl.value);
-        const fencePts = calculateFencePoints(
-          rec,
-          cfg.fence_base_victories,
-          cfg.fence_base_points,
-          cfg.fence_points_per_victory
-        );
-        if (fencePts != null) {
-          fencePtsEl.value = fencePts;
-        }
+        const fencePts = calculateFencePoints(rec, cfg.fence_base_victories, cfg.fence_base_points, cfg.fence_points_per_victory);
+        if (fencePts != null) fencePtsEl.value = fencePts;
       }
 
       if (swimRawEl && swimPtsEl) {
         const sec = parseTimeToSeconds(swimRawEl.value);
-        const swimPts = calculateTimePoints(
-          sec,
-          cfg.swim_base_time_seconds,
-          cfg.swim_base_points,
-          cfg.swim_points_per_second
-        );
-        if (swimPts != null) {
-          swimPtsEl.value = swimPts;
-        }
+        const swimPts = calculateTimePoints(sec, cfg.swim_base_time_seconds, cfg.swim_base_points, cfg.swim_points_per_second);
+        if (swimPts != null) swimPtsEl.value = swimPts;
       }
 
       if (obstRawEl && obstPtsEl) {
         const sec = parseTimeToSeconds(obstRawEl.value);
-        const obstPts = calculateTimePoints(
-          sec,
-          cfg.obstacle_base_time_seconds,
-          cfg.obstacle_base_points,
-          cfg.obstacle_points_per_second
-        );
-        if (obstPts != null) {
-          obstPtsEl.value = obstPts;
-        }
+        const obstPts = calculateTimePoints(sec, cfg.obstacle_base_time_seconds, cfg.obstacle_base_points, cfg.obstacle_points_per_second);
+        if (obstPts != null) obstPtsEl.value = obstPts;
       }
 
       if (laserRawEl && laserPtsEl) {
         const sec = parseTimeToSeconds(laserRawEl.value);
-        const laserPts = calculateTimePoints(
-          sec,
-          cfg.laser_base_time_seconds,
-          cfg.laser_base_points,
-          cfg.laser_points_per_second
-        );
-        if (laserPts != null) {
-          laserPtsEl.value = laserPts;
-        }
+        const laserPts = calculateTimePoints(sec, cfg.laser_base_time_seconds, cfg.laser_base_points, cfg.laser_points_per_second);
+        if (laserPts != null) laserPtsEl.value = laserPts;
       }
 
       setResultsListMessage("Points calculated (not yet saved). Click Save to store.", "success");
@@ -1186,10 +1149,7 @@
 
       const { data: allEntries, error } = await supabase
         .from("entries")
-        .select(`
-          id,
-          results (discipline, points)
-        `)
+        .select(`id, results (discipline, points)`)
         .eq("division_id", divisionId);
 
       if (error) {
@@ -1198,15 +1158,11 @@
         return;
       }
 
-      if (!allEntries || allEntries.length === 0) {
-        return;
-      }
+      if (!allEntries || allEntries.length === 0) return;
 
       const totals = allEntries.map(e => {
         const resArr = e.results || [];
-        const total = resArr.reduce((sum, r) => {
-          return sum + (typeof r.points === "number" ? r.points : 0);
-        }, 0);
+        const total = resArr.reduce((sum, r) => sum + (typeof r.points === "number" ? r.points : 0), 0);
         return { id: e.id, total };
       });
 
@@ -1214,11 +1170,7 @@
 
       for (const t of totals) {
         const handicap = maxTotal - t.total;
-        const { error: updErr } = await supabase
-          .from("entries")
-          .update({ handicap })
-          .eq("id", t.id);
-
+        const { error: updErr } = await supabase.from("entries").update({ handicap }).eq("id", t.id);
         if (updErr) {
           console.error(updErr);
           setResultsListMessage("Failed to update some handicaps: " + (updErr.message || ""), "error");
@@ -1262,11 +1214,7 @@
       setResultsListMessage("Saving results...");
 
       for (const disc of deletes) {
-        const { error } = await supabase
-          .from("results")
-          .delete()
-          .eq("entry_id", id)
-          .eq("discipline", disc);
+        const { error } = await supabase.from("results").delete().eq("entry_id", id).eq("discipline", disc);
         if (error) {
           console.error(error);
           setResultsListMessage("Failed to save some results (delete). " + (error.message || ""), "error");
@@ -1275,9 +1223,7 @@
       }
 
       if (upserts.length > 0) {
-        const { error } = await supabase
-          .from("results")
-          .upsert(upserts, { onConflict: "entry_id,discipline" });
+        const { error } = await supabase.from("results").upsert(upserts, { onConflict: "entry_id,discipline" });
         if (error) {
           console.error(error);
           setResultsListMessage("Failed to save some results (upsert). " + (error.message || ""), "error");
@@ -1311,10 +1257,7 @@
 
     async function loadCompetitions() {
       setListMessage("Loading competitions...");
-      const { data, error } = await supabase
-        .from("competitions")
-        .select("*")
-        .order("start_date", { ascending: false });
+      const { data, error } = await supabase.from("competitions").select("*").order("start_date", { ascending: false });
 
       if (error) {
         console.error(error);
@@ -1370,7 +1313,7 @@
         return;
       }
 
-      const divisions = await loadDivisionsForCompetition(competitionId);
+      await loadDivisionsForCompetition(competitionId);
       populateAthleteDivisionSelect(sortedDivisionsForCompId(competitionId));
     }
 
@@ -1394,6 +1337,7 @@
           athlete_id,
           created_at,
           handicap,
+          tie_break_order,
           athletes (
             first_name,
             last_name,
@@ -1440,11 +1384,7 @@
 
           setDivisionListMessage("Deleting division and related data...");
 
-          const { data: entries, error: entriesError } = await supabase
-            .from("entries")
-            .select("id")
-            .eq("division_id", divisionId);
-
+          const { data: entries, error: entriesError } = await supabase.from("entries").select("id").eq("division_id", divisionId);
           if (entriesError) {
             console.error(entriesError);
             setDivisionListMessage("Failed to load entries for division.", "error");
@@ -1454,11 +1394,7 @@
           const entryIds = (entries || []).map(e => e.id);
 
           if (entryIds.length > 0) {
-            const { error: resultsError } = await supabase
-              .from("results")
-              .delete()
-              .in("entry_id", entryIds);
-
+            const { error: resultsError } = await supabase.from("results").delete().in("entry_id", entryIds);
             if (resultsError) {
               console.error(resultsError);
               setDivisionListMessage("Failed to delete results for division.", "error");
@@ -1466,22 +1402,14 @@
             }
           }
 
-          const { error: delEntriesError } = await supabase
-            .from("entries")
-            .delete()
-            .eq("division_id", divisionId);
-
+          const { error: delEntriesError } = await supabase.from("entries").delete().eq("division_id", divisionId);
           if (delEntriesError) {
             console.error(delEntriesError);
             setDivisionListMessage("Failed to delete entries for division.", "error");
             return;
           }
 
-          const { error: divError } = await supabase
-            .from("divisions")
-            .delete()
-            .eq("id", divisionId);
-
+          const { error: divError } = await supabase.from("divisions").delete().eq("id", divisionId);
           if (divError) {
             console.error(divError);
             setDivisionListMessage("Failed to delete division.", "error");
@@ -1490,7 +1418,7 @@
 
           setDivisionListMessage("Division deleted.", "success");
 
-          const divisions = await loadDivisionsForCompetition(compId);
+          await loadDivisionsForCompetition(compId);
           populateAthleteDivisionSelect(sortedDivisionsForCompId(compId));
 
           if (Number(athleteDivSelect.value) === divisionId) {
@@ -1532,22 +1460,15 @@
 
           for (let i = 0; i < swapped.length; i++) {
             const d = swapped[i];
-            const { error } = await supabase
-              .from("divisions")
-              .update({ order_index: i + 1 })
-              .eq("id", d.id);
-
+            const { error } = await supabase.from("divisions").update({ order_index: i + 1 }).eq("id", d.id);
             if (error) {
               console.error(error);
-              setDivisionListMessage(
-                "Failed to update division order: " + (error.message || ""),
-                "error"
-              );
+              setDivisionListMessage("Failed to update division order: " + (error.message || ""), "error");
               return;
             }
           }
 
-          const divisions = await loadDivisionsForCompetition(compId);
+          await loadDivisionsForCompetition(compId);
           populateAthleteDivisionSelect(sortedDivisionsForCompId(compId));
           setDivisionListMessage("Division order updated.", "success");
         });
@@ -1586,13 +1507,7 @@
         return;
       }
 
-      const { error } = await supabase.from("competitions").insert({
-        name,
-        location,
-        start_date: startDate,
-        end_date: endDate,
-        status
-      });
+      const { error } = await supabase.from("competitions").insert({ name, location, start_date: startDate, end_date: endDate, status });
 
       if (error) {
         console.error(error);
@@ -1615,10 +1530,7 @@
       }
 
       setStatusUpdateMessage("Updating status...");
-      const { error } = await supabase
-        .from("competitions")
-        .update({ status: newStatus })
-        .eq("id", compId);
+      const { error } = await supabase.from("competitions").update({ status: newStatus }).eq("id", compId);
 
       if (error) {
         console.error(error);
@@ -1696,40 +1608,28 @@
       };
 
       if (editingDivisionId) {
-        const { error } = await supabase
-          .from("divisions")
-          .update(baseFields)
-          .eq("id", editingDivisionId);
-
+        const { error } = await supabase.from("divisions").update(baseFields).eq("id", editingDivisionId);
         if (error) {
           console.error(error);
           setDivisionFormMessage("Failed to save division changes: " + (error.message || ""), "error");
           return;
         }
-
         setDivisionFormMessage("Division updated.", "success");
         enterDivisionAddMode();
       } else {
-        const insertObj = {
-          competition_id: Number(competitionId),
-          order_index: 0,
-          ...baseFields
-        };
-
+        const insertObj = { competition_id: Number(competitionId), order_index: 0, ...baseFields };
         const { error } = await supabase.from("divisions").insert(insertObj);
-
         if (error) {
           console.error(error);
           setDivisionFormMessage("Failed to add division: " + (error.message || ""), "error");
           return;
         }
-
         setDivisionFormMessage("Division added.", "success");
         divisionForm.reset();
         document.getElementById("div-gender").value = "M";
       }
 
-      const divisions = await loadDivisionsForCompetition(competitionId);
+      await loadDivisionsForCompetition(competitionId);
       populateAthleteDivisionSelect(sortedDivisionsForCompId(competitionId));
     });
 
@@ -1805,11 +1705,7 @@
 
       const { data: newAthlete, error: athleteError } = await supabase
         .from("athletes")
-        .insert({
-          first_name: firstName,
-          last_name: lastName,
-          noc: noc || null
-        })
+        .insert({ first_name: firstName, last_name: lastName, noc: noc || null })
         .select()
         .single();
 
@@ -1821,11 +1717,7 @@
 
       const { error: entryError } = await supabase
         .from("entries")
-        .insert({
-          competition_id: Number(compId),
-          division_id: Number(divisionId),
-          athlete_id: newAthlete.id
-        });
+        .insert({ competition_id: Number(compId), division_id: Number(divisionId), athlete_id: newAthlete.id });
 
       if (entryError) {
         console.error(entryError);
