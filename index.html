@@ -166,7 +166,7 @@
       <h1>Results</h1>
       <p class="note">Select a competition to view division leaderboards.</p>
 
-      <label for="competition-select">Competition</label>
+      <label for="competition-select">Current Competition</label>
       <select id="competition-select">
         <option value="">Select a competition</option>
       </select>
@@ -472,6 +472,7 @@
       }
 
       competitionsCache = data || [];
+      setMsg("");
 
       competitionSelect.innerHTML = `
         <option value="">Select a competition</option>
