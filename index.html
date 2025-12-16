@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>PentathlonScore – Results</title>
+  <title>PentathlonScore – Live Results</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root { color-scheme: light dark; }
@@ -87,7 +87,7 @@
 
     select {
       width: 100%;
-      max-width: 360px;
+      max-width: 320px;
       padding: 6px 8px;
       font-size: 0.9rem;
       border-radius: 4px;
@@ -100,25 +100,11 @@
       box-shadow: 0 0 0 1px #6366f1;
     }
 
-    .select-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 12px;
-      margin-top: 10px;
-    }
-
-    @media (min-width: 720px) {
-      .select-grid {
-        grid-template-columns: 1fr 1fr;
-        align-items: end;
-      }
-    }
-
     .message { font-size: 0.85rem; margin-top: 6px; }
     .message.error { color: #b91c1c; }
     .message.info { color: #6b7280; }
 
-    .comp-meta { font-size: 0.85rem; color: #4b5563; margin-top: 8px; }
+    .comp-meta { font-size: 0.85rem; color: #4b5563; margin-top: 6px; }
 
     .pill {
       display: inline-block;
@@ -187,20 +173,18 @@
     th, td {
       padding: 6px 8px;
       border-bottom: 1px solid #e5e7eb;
+      text-align: right;
       white-space: nowrap;
-      vertical-align: middle;
     }
 
     th {
       background: #f9fafb;
       font-weight: 600;
+      text-align: right;
     }
 
-    /* Column alignment */
     th:first-child, td:first-child { text-align: center; }
     th:nth-child(2), td:nth-child(2) { text-align: left; }
-    th:not(:first-child):not(:nth-child(2)),
-    td:not(:first-child):not(:nth-child(2)) { text-align: right; }
 
     tr:nth-child(even) td { background: #f9fafb; }
 
@@ -212,7 +196,7 @@
 
     .name-cell {
       font-weight: 500;
-      max-width: 190px; /* narrowed slightly to make room */
+      max-width: 220px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -220,30 +204,9 @@
 
     .noc-cell { font-size: 0.8rem; color: #6b7280; }
 
-    /* Discipline cell two-line layout */
-    td.disc-cell, th.disc-head {
-      text-align: center !important;
-    }
-
-    .disc-wrap {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      line-height: 1.1;
+    .disc-cell {
+      font-size: 0.8rem;
       font-variant-numeric: tabular-nums;
-    }
-
-    .disc-top {
-      font-size: 0.82rem;
-      color: #111827;
-    }
-
-    .disc-bottom {
-      margin-top: 2px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: #111827;
     }
 
     .handicap-cell { font-variant-numeric: tabular-nums; }
@@ -251,7 +214,7 @@
     @media (max-width: 640px) {
       th, td { padding: 4px 6px; font-size: 0.8rem; }
       .division-header { flex-direction: column; align-items: flex-start; }
-      .name-cell { max-width: 140px; }
+      .name-cell { max-width: 150px; }
     }
 
     @media print {
@@ -259,11 +222,11 @@
       body { background: #ffffff; }
       main { max-width: none; margin: 0; padding: 0; }
       .card { box-shadow: none; border-radius: 0; margin: 0 0 8px; }
-      #selectors-card .note,
-      #selectors-card select,
+      #competition-select,
       #competition-message,
       #division-jump-container,
-      .print-btn { display: none !important; }
+      .print-btn,
+      .note { display: none !important; }
     }
   </style>
 </head>
@@ -277,25 +240,14 @@
   </header>
 
   <main>
-    <div class="card" id="selectors-card">
-      <h1>Results</h1>
-      <p class="note">Select a competition to view division leaderboards. Live competitions update as the admin enters results.</p>
+    <div class="card">
+      <h1>Live Results</h1>
+      <p class="note">Select a competition to view division leaderboards. Results are updated live by the admin.</p>
 
-      <div class="select-grid">
-        <div>
-          <label for="current-competition-select">Current Competition</label>
-          <select id="current-competition-select">
-            <option value="">Select a live competition</option>
-          </select>
-        </div>
-
-        <div>
-          <label for="past-competition-select">Past Competitions</label>
-          <select id="past-competition-select">
-            <option value="">Select a finished competition</option>
-          </select>
-        </div>
-      </div>
+      <label for="competition-select">Competition</label>
+      <select id="competition-select">
+        <option value="">Select a competition</option>
+      </select>
 
       <div id="competition-message" class="message info"></div>
       <div id="competition-meta" class="comp-meta"></div>
@@ -318,19 +270,14 @@
     const { createClient } = window.supabase;
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    const currentSelect = document.getElementById("current-competition-select");
-    const pastSelect = document.getElementById("past-competition-select");
+    const competitionSelect = document.getElementById("competition-select");
     const competitionMessage = document.getElementById("competition-message");
     const competitionMeta = document.getElementById("competition-meta");
     const divisionJumpContainer = document.getElementById("division-jump-container");
     const leaderboardContainer = document.getElementById("leaderboard-container");
     const printBtn = document.getElementById("print-btn");
 
-    let liveCompetitions = [];
-    let finishedCompetitions = [];
-    let activeCompetition = null;
-
-    const SPECIAL_WORST = new Set(["DNS", "DNF", "DSQ", "EL"]);
+    let competitionsCache = [];
 
     function setCompetitionMessage(text, type = "info") {
       competitionMessage.textContent = text || "";
@@ -364,142 +311,15 @@
       return sign + m + ":" + sStr;
     }
 
-    function parseTimeToSeconds(str) {
-      if (!str) return null;
-      const s = String(str).trim();
-      if (!s) return null;
+    function formatDisciplineCell(discObj) {
+      if (!discObj) return "";
+      const raw = (discObj.raw || "").trim();
+      const pts = (typeof discObj.pts === "number") ? discObj.pts : null;
 
-      const upper = s.toUpperCase();
-      if (SPECIAL_WORST.has(upper)) return null; // handled as "worst" via special flag
-
-      // seconds only
-      if (/^\d+(\.\d+)?$/.test(s)) return parseFloat(s);
-
-      // M:SS.xx
-      const parts = s.split(":");
-      if (parts.length === 2) {
-        const mins = parseFloat(parts[0]);
-        const secs = parseFloat(parts[1]);
-        if (isNaN(mins) || isNaN(secs)) return null;
-        return mins * 60 + secs;
-      }
-
-      return null;
-    }
-
-    function parseFenceVictories(str) {
-      if (!str) return null;
-      const s = String(str).trim();
-      if (!s) return null;
-
-      const upper = s.toUpperCase();
-      if (SPECIAL_WORST.has(upper)) return null; // handled as "worst"
-
-      // e.g., 18V 15D
-      const regex = /(\d+)\s*[Vv]\b/;
-      const m = s.match(regex);
-      if (m) {
-        const v = parseInt(m[1], 10);
-        return isNaN(v) ? null : v;
-      }
-
-      // allow bare number = victories
-      if (/^\d+$/.test(s)) return parseInt(s, 10);
-
-      return null;
-    }
-
-    /**
-     * Compute discipline places (1,1,3...) based on raw performance.
-     * Only assigns a place if raw is present (including DNS/DNF/DSQ/EL).
-     * Special codes are treated as worst and tied for last.
-     */
-    function computeDisciplinePlaces(rows, discipline) {
-      // Create score objects for only rows with raw entered
-      const scored = [];
-
-      for (const r of rows) {
-        const raw = (r[discipline]?.raw || "").trim();
-        if (!raw) continue;
-
-        const upper = raw.toUpperCase();
-        const isSpecialWorst = SPECIAL_WORST.has(upper);
-
-        let metric = null;
-
-        if (!isSpecialWorst) {
-          if (discipline === "fence") {
-            metric = parseFenceVictories(raw); // higher better
-          } else {
-            metric = parseTimeToSeconds(raw);  // lower better
-          }
-        }
-
-        // If metric couldn't be parsed, treat as worst too
-        scored.push({
-          entryId: r.entryId,
-          raw,
-          isWorst: isSpecialWorst || metric == null,
-          metric
-        });
-      }
-
-      if (!scored.length) return new Map();
-
-      // Sort best -> worst
-      scored.sort((a, b) => {
-        // worst always last
-        if (a.isWorst && !b.isWorst) return 1;
-        if (!a.isWorst && b.isWorst) return -1;
-
-        // both worst => tied
-        if (a.isWorst && b.isWorst) return 0;
-
-        // both non-worst: compare metric
-        if (discipline === "fence") {
-          // higher victories better
-          if (b.metric !== a.metric) return b.metric - a.metric;
-          return 0;
-        } else {
-          // lower time better
-          if (a.metric !== b.metric) return a.metric - b.metric;
-          return 0;
-        }
-      });
-
-      // Assign 1,1,3... ranking
-      const placeByEntry = new Map();
-      let lastKey = null;
-      let lastPlace = 0;
-
-      for (let i = 0; i < scored.length; i++) {
-        const s = scored[i];
-
-        // key for tie grouping
-        // - worst group all tied together
-        // - otherwise metric determines ties
-        let key;
-        if (s.isWorst) {
-          key = "WORST";
-        } else {
-          key = String(s.metric);
-        }
-
-        let place;
-        if (i === 0) {
-          place = 1;
-        } else if (key === lastKey) {
-          place = lastPlace;
-        } else {
-          place = i + 1;
-        }
-
-        placeByEntry.set(s.entryId, place);
-        lastKey = key;
-        lastPlace = place;
-      }
-
-      return placeByEntry;
+      if (raw && pts != null) return `${raw} (${pts})`;
+      if (raw) return raw;
+      if (pts != null) return String(pts);
+      return "";
     }
 
     function buildDivisionRows(division) {
@@ -509,10 +329,10 @@
         const resArr = e.results || [];
 
         const byDisc = {
-          fence: { raw: "", pts: null },
-          swim: { raw: "", pts: null },
-          obstacle: { raw: "", pts: null },
-          laser: { raw: "", pts: null }
+          fence: { raw: null, pts: null },
+          swim: { raw: null, pts: null },
+          obstacle: { raw: null, pts: null },
+          laser: { raw: null, pts: null }
         };
 
         resArr.forEach(r => {
@@ -521,7 +341,7 @@
           if (!byDisc[key]) return;
 
           byDisc[key] = {
-            raw: r.raw_value || "",
+            raw: r.raw_value || null,
             pts: (typeof r.points === "number")
               ? r.points
               : (r.points == null ? null : Number(r.points))
@@ -555,10 +375,14 @@
         };
       });
 
-      // Post-laser mode if at least one athlete has laser points saved
+      // Determine whether division is in "post-laser" mode
+      // If at least one athlete has laser points, we'll treat the division as post-laser for place display.
       const divisionHasLaser = rows.some(r => r.hasLaser);
 
-      // Sort totals desc; if post-laser and both have laser, use tieBreak asc (nulls last); then name
+      // Sort:
+      // - Always by total desc
+      // - If totals tie AND BOTH athletes have laser points (post-laser), apply tieBreak asc (nulls last)
+      // - Finally name asc for stable ordering
       rows.sort((a, b) => {
         if (b.total !== a.total) return b.total - a.total;
 
@@ -571,6 +395,7 @@
         return a.name.localeCompare(b.name);
       });
 
+      // attach helper flag for rendering places
       rows._divisionHasLaser = divisionHasLaser;
       return rows;
     }
@@ -604,30 +429,7 @@
       }).join("");
     }
 
-    function renderDisciplineCell(raw, pts, place) {
-      const rawTrim = (raw || "").trim();
-      const showPlace = !!rawTrim && (place != null);
-
-      const top = rawTrim
-        ? `${rawTrim}${showPlace ? ` (${place})` : ""}`
-        : "";
-
-      const bottom = (typeof pts === "number") ? String(pts) : "";
-
-      // If absolutely nothing, return blank
-      if (!top && !bottom) return "";
-
-      return `
-        <div class="disc-wrap">
-          <div class="disc-top">${top}</div>
-          <div class="disc-bottom">${bottom}</div>
-        </div>
-      `;
-    }
-
     function renderCompetitionLeaderboards(competition) {
-      activeCompetition = competition || null;
-
       if (!competition) {
         leaderboardContainer.innerHTML = "";
         divisionJumpContainer.innerHTML = "";
@@ -645,7 +447,6 @@
         ${statusHtml}
         ${location ? `<span class="pill">${location}</span>` : ""}
         ${range ? `<span class="pill">${range}</span>` : ""}
-        ${competition.status === "finished" ? `<span class="pill">Finished</span>` : ""}
       `;
 
       renderDivisionJumpButtons(competition);
@@ -674,12 +475,6 @@
         const rows = buildDivisionRows(div);
         const divisionHasLaser = !!rows._divisionHasLaser;
 
-        // Discipline places (based on raw)
-        const fencePlaces = computeDisciplinePlaces(rows, "fence");
-        const swimPlaces = computeDisciplinePlaces(rows, "swim");
-        const obstaclePlaces = computeDisciplinePlaces(rows, "obstacle");
-        const laserPlaces = computeDisciplinePlaces(rows, "laser");
-
         const tags = [];
         if (div.age_group) tags.push(div.age_group);
         if (div.gender) tags.push(div.gender);
@@ -698,9 +493,9 @@
           `;
         }
 
-        // Place rules for overall division:
+        // Place rendering rules:
         // - Pre-laser: ties shown as 1,1,1,4 based on total points
-        // - Post-laser: unique places 1..N based on sorted order (tieBreak resolves close finishes)
+        // - Post-laser: unique places (1..N) based on sorted order (tieBreak resolves close finishes)
         let lastPoints = null;
         let lastPlace = 0;
 
@@ -710,6 +505,7 @@
           if (divisionHasLaser) {
             place = idx + 1;
           } else {
+            // tie-aware ranking: 1,1,1,4...
             if (idx === 0) place = 1;
             else if (r.total === lastPoints) place = lastPlace;
             else place = idx + 1;
@@ -725,22 +521,12 @@
                 <div class="name-cell">${r.name || ""}</div>
                 <div class="noc-cell">${r.noc || ""}</div>
               </td>
-
-              <td class="disc-cell">
-                ${renderDisciplineCell(r.fence.raw, r.fence.pts, fencePlaces.get(r.entryId) ?? null)}
-              </td>
-              <td class="disc-cell">
-                ${renderDisciplineCell(r.swim.raw, r.swim.pts, swimPlaces.get(r.entryId) ?? null)}
-              </td>
-              <td class="disc-cell">
-                ${renderDisciplineCell(r.obstacle.raw, r.obstacle.pts, obstaclePlaces.get(r.entryId) ?? null)}
-              </td>
-              <td class="disc-cell">
-                ${renderDisciplineCell(r.laser.raw, r.laser.pts, laserPlaces.get(r.entryId) ?? null)}
-              </td>
-
-              <td style="text-align:right;">${r.total || 0}</td>
-              <td class="handicap-cell" style="text-align:right;">${formatHandicap(r.handicap)}</td>
+              <td class="disc-cell">${formatDisciplineCell(r.fence)}</td>
+              <td class="disc-cell">${formatDisciplineCell(r.swim)}</td>
+              <td class="disc-cell">${formatDisciplineCell(r.obstacle)}</td>
+              <td class="disc-cell">${formatDisciplineCell(r.laser)}</td>
+              <td>${r.total || 0}</td>
+              <td class="handicap-cell">${formatHandicap(r.handicap)}</td>
             </tr>
           `;
         }).join("");
@@ -758,10 +544,10 @@
                 <tr>
                   <th>Place</th>
                   <th>Athlete</th>
-                  <th class="disc-head">Fence</th>
-                  <th class="disc-head">Swim</th>
-                  <th class="disc-head">Obstacle</th>
-                  <th class="disc-head">Laser Run</th>
+                  <th>Fence</th>
+                  <th>Swim</th>
+                  <th>Obstacle</th>
+                  <th>Laser Run</th>
                   <th>Total</th>
                   <th>Handicap<br/><span style="font-size:0.7rem;">m:ss</span></th>
                 </tr>
@@ -819,81 +605,45 @@
       if (error) {
         console.error(error);
         setCompetitionMessage("Failed to load competitions.", "error");
-        currentSelect.innerHTML = '<option value="">Select a live competition</option>';
-        pastSelect.innerHTML = '<option value="">Select a finished competition</option>';
-        renderCompetitionLeaderboards(null);
+        competitionSelect.innerHTML = '<option value="">Select a competition</option>';
+        leaderboardContainer.innerHTML = "";
         return;
       }
 
-      const all = data || [];
-      console.log("Public competitions returned:", all.map(c => ({
-  name: c.name,
-  status: c.status
-})));
+      competitionsCache = data || [];
 
-      liveCompetitions = all.filter(c => (c.status || "").toLowerCase() === "live");
-      finishedCompetitions = all.filter(c => (c.status || "").toLowerCase() === "finished");
-
-      // Populate selects (NO auto selection)
-      currentSelect.innerHTML = `
-        <option value="">Select a live competition</option>
-        ${liveCompetitions.map(c => `<option value="${c.id}">${c.name}</option>`).join("")}
-      `;
-      pastSelect.innerHTML = `
-        <option value="">Select a finished competition</option>
-        ${finishedCompetitions.map(c => `<option value="${c.id}">${c.name}</option>`).join("")}
-      `;
-
-      setCompetitionMessage("Select a Current or Past competition to view results.", "info");
-      renderCompetitionLeaderboards(null);
-    }
-
-    function clearDisplay() {
-      competitionMeta.innerHTML = "";
-      divisionJumpContainer.innerHTML = "";
-      leaderboardContainer.innerHTML = "";
-      printBtn.disabled = true;
-      printBtn.style.display = "none";
-      activeCompetition = null;
-    }
-
-    currentSelect.addEventListener("change", () => {
-      const id = currentSelect.value;
-
-      // If selecting live, clear past selection
-      if (id) pastSelect.value = "";
-
-      clearDisplay();
-
-      if (!id) {
-        setCompetitionMessage("Select a Current or Past competition to view results.", "info");
+      if (!competitionsCache.length) {
+        setCompetitionMessage("No live or finished competitions are currently available.", "info");
+        competitionSelect.innerHTML = '<option value="">Select a competition</option>';
+        leaderboardContainer.innerHTML = "";
+        printBtn.disabled = true;
+        printBtn.style.display = "none";
         return;
       }
-
-      const comp = liveCompetitions.find(c => String(c.id) === String(id));
-      if (!comp) return;
 
       setCompetitionMessage("");
-      renderCompetitionLeaderboards(comp);
-    });
 
-    pastSelect.addEventListener("change", () => {
-      const id = pastSelect.value;
+      competitionSelect.innerHTML = `
+        <option value="">Select a competition</option>
+        ${competitionsCache.map(c => `<option value="${c.id}">${c.name}</option>`).join("")}
+      `;
+    }
 
-      // If selecting finished, clear current selection
-      if (id) currentSelect.value = "";
-
-      clearDisplay();
+    competitionSelect.addEventListener("change", () => {
+      const id = competitionSelect.value;
 
       if (!id) {
-        setCompetitionMessage("Select a Current or Past competition to view results.", "info");
+        competitionMeta.innerHTML = "";
+        divisionJumpContainer.innerHTML = "";
+        leaderboardContainer.innerHTML = "";
+        printBtn.disabled = true;
+        printBtn.style.display = "none";
         return;
       }
 
-      const comp = finishedCompetitions.find(c => String(c.id) === String(id));
+      const comp = competitionsCache.find(c => String(c.id) === String(id));
       if (!comp) return;
 
-      setCompetitionMessage("");
       renderCompetitionLeaderboards(comp);
     });
 
@@ -912,3 +662,4 @@
   </script>
 </body>
 </html>
+
