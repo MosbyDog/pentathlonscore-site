@@ -826,6 +826,11 @@
       }
 
       const all = data || [];
+      console.log("Public competitions returned:", all.map(c => ({
+  name: c.name,
+  status: c.status
+})));
+
       liveCompetitions = all.filter(c => (c.status || "").toLowerCase() === "live");
       finishedCompetitions = all.filter(c => (c.status || "").toLowerCase() === "finished");
 
