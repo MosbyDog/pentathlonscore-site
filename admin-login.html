@@ -133,7 +133,7 @@
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNid2lmbWdyZWt1Z29samNhcW9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3MDcxODYsImV4cCI6MjA4MDI4MzE4Nn0.Rp5MCWYQL9SxbnBEJ7e76gbbd95qsStaLE2Hkhpn47g";
 
     const { createClient } = window.supabase;
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const form = document.getElementById("login-form");
     const msgEl = document.getElementById("message");
@@ -144,7 +144,7 @@
     }
 
     async function checkExistingSession() {
-      const { data, error } = await supabase.auth.getSession();
+      const { data, error } = await sb.auth.getSession();
       if (data && data.session) {
         // Already logged in → go straight to admin dashboard
         window.location.href = "/admin.html";
@@ -165,7 +165,7 @@
         return;
       }
 
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
 
       if (error) {
         console.error(error);
