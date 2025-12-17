@@ -519,13 +519,12 @@
 
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script>
-    const SUPABASE_URL = "https://cbwifmgrekugoljcaqoh.supabase.co";
+    const SUPABASE_URL = "https://cbwifmgrekugoljcaqoh.sb.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNid2lmbWdyZWt1Z29samNhcW9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3MDcxODYsImV4cCI6MjA4MDI4MzE4Nn0.Rp5MCWYQL9SxbnBEJ7e76gbbd95qsStaLE2Hkhpn47g";
 
     const { createClient } = window.supabase;
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-const sb = supabase;
-window.sb = supabase;
+window.sb = sb;
 
     const logoutBtn = document.getElementById("logoutBtn");
 
@@ -610,14 +609,14 @@ window.sb = supabase;
     }
 
     async function requireAuth() {
-      const { data } = await supabase.auth.getSession();
+      const { data } = await sb.auth.getSession();
       if (!data || !data.session) {
         window.location.href = "/admin-login.html";
       }
     }
 
     logoutBtn.addEventListener("click", async () => {
-      await supabase.auth.signOut();
+      await sb.auth.signOut();
       window.location.href = "/admin-login.html";
     });
 
@@ -826,7 +825,7 @@ window.sb = supabase;
           if (!ok) return;
 
           setAthleteListMessage("Removing athlete from division...");
-          const { error } = await supabase.from("entries").delete().eq("id", entryId);
+          const { error } = await sb.from("entries").delete().eq("id", entryId);
 
           if (error) {
             console.error(error);
@@ -1172,7 +1171,7 @@ window.sb = supabase;
 
       for (const t of totals) {
         const handicap = maxTotal - t.total;
-        const { error: updErr } = await supabase.from("entries").update({ handicap }).eq("id", t.id);
+        const { error: updErr } = await sb.from("entries").update({ handicap }).eq("id", t.id);
         if (updErr) {
           console.error(updErr);
           setResultsListMessage("Failed to update some handicaps: " + (updErr.message || ""), "error");
@@ -1216,7 +1215,7 @@ window.sb = supabase;
       setResultsListMessage("Saving results...");
 
       for (const disc of deletes) {
-        const { error } = await supabase.from("results").delete().eq("entry_id", id).eq("discipline", disc);
+        const { error } = await sb.from("results").delete().eq("entry_id", id).eq("discipline", disc);
         if (error) {
           console.error(error);
           setResultsListMessage("Failed to save some results (delete). " + (error.message || ""), "error");
@@ -1225,7 +1224,7 @@ window.sb = supabase;
       }
 
       if (upserts.length > 0) {
-        const { error } = await supabase.from("results").upsert(upserts, { onConflict: "entry_id,discipline" });
+        const { error } = await sb.from("results").upsert(upserts, { onConflict: "entry_id,discipline" });
         if (error) {
           console.error(error);
           setResultsListMessage("Failed to save some results (upsert). " + (error.message || ""), "error");
@@ -1259,7 +1258,7 @@ window.sb = supabase;
 
     async function loadCompetitions() {
       setListMessage("Loading competitions...");
-      const { data, error } = await supabase.from("competitions").select("*").order("start_date", { ascending: false });
+      const { data, error } = await sb.from("competitions").select("*").order("start_date", { ascending: false });
 
       if (error) {
         console.error(error);
@@ -1386,7 +1385,7 @@ window.sb = supabase;
 
           setDivisionListMessage("Deleting division and related data...");
 
-          const { data: entries, error: entriesError } = await supabase.from("entries").select("id").eq("division_id", divisionId);
+          const { data: entries, error: entriesError } = await sb.from("entries").select("id").eq("division_id", divisionId);
           if (entriesError) {
             console.error(entriesError);
             setDivisionListMessage("Failed to load entries for division.", "error");
@@ -1396,7 +1395,7 @@ window.sb = supabase;
           const entryIds = (entries || []).map(e => e.id);
 
           if (entryIds.length > 0) {
-            const { error: resultsError } = await supabase.from("results").delete().in("entry_id", entryIds);
+            const { error: resultsError } = await sb.from("results").delete().in("entry_id", entryIds);
             if (resultsError) {
               console.error(resultsError);
               setDivisionListMessage("Failed to delete results for division.", "error");
@@ -1404,14 +1403,14 @@ window.sb = supabase;
             }
           }
 
-          const { error: delEntriesError } = await supabase.from("entries").delete().eq("division_id", divisionId);
+          const { error: delEntriesError } = await sb.from("entries").delete().eq("division_id", divisionId);
           if (delEntriesError) {
             console.error(delEntriesError);
             setDivisionListMessage("Failed to delete entries for division.", "error");
             return;
           }
 
-          const { error: divError } = await supabase.from("divisions").delete().eq("id", divisionId);
+          const { error: divError } = await sb.from("divisions").delete().eq("id", divisionId);
           if (divError) {
             console.error(divError);
             setDivisionListMessage("Failed to delete division.", "error");
@@ -1462,7 +1461,7 @@ window.sb = supabase;
 
           for (let i = 0; i < swapped.length; i++) {
             const d = swapped[i];
-            const { error } = await supabase.from("divisions").update({ order_index: i + 1 }).eq("id", d.id);
+            const { error } = await sb.from("divisions").update({ order_index: i + 1 }).eq("id", d.id);
             if (error) {
               console.error(error);
               setDivisionListMessage("Failed to update division order: " + (error.message || ""), "error");
@@ -1509,7 +1508,7 @@ window.sb = supabase;
         return;
       }
 
-      const { error } = await supabase.from("competitions").insert({ name, location, start_date: startDate, end_date: endDate, status });
+      const { error } = await sb.from("competitions").insert({ name, location, start_date: startDate, end_date: endDate, status });
 
       if (error) {
         console.error(error);
@@ -1532,7 +1531,7 @@ window.sb = supabase;
       }
 
       setStatusUpdateMessage("Updating status...");
-      const { error } = await supabase.from("competitions").update({ status: newStatus }).eq("id", compId);
+      const { error } = await sb.from("competitions").update({ status: newStatus }).eq("id", compId);
 
       if (error) {
         console.error(error);
@@ -1610,7 +1609,7 @@ window.sb = supabase;
       };
 
       if (editingDivisionId) {
-        const { error } = await supabase.from("divisions").update(baseFields).eq("id", editingDivisionId);
+        const { error } = await sb.from("divisions").update(baseFields).eq("id", editingDivisionId);
         if (error) {
           console.error(error);
           setDivisionFormMessage("Failed to save division changes: " + (error.message || ""), "error");
@@ -1620,7 +1619,7 @@ window.sb = supabase;
         enterDivisionAddMode();
       } else {
         const insertObj = { competition_id: Number(competitionId), order_index: 0, ...baseFields };
-        const { error } = await supabase.from("divisions").insert(insertObj);
+        const { error } = await sb.from("divisions").insert(insertObj);
         if (error) {
           console.error(error);
           setDivisionFormMessage("Failed to add division: " + (error.message || ""), "error");
