@@ -524,8 +524,6 @@
 
     const { createClient } = window.supabase;
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-// Backwards-compatible alias (prevents “sb is not defined” issues)
 const sb = supabase;
 window.sb = supabase;
 
